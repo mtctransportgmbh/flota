@@ -3970,8 +3970,8 @@ function srvmEsc(x){return String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp
 function srvmFmtDate(d){return d?String(d).split('-').reverse().join('.'):'—';}
 
 // Detectare robustă: fără diacritice, plural/singular, ordine liberă; o reparație poate fi în mai multe categorii
-function srvmCatsFor(descriere, obs){
-  const d=((descriere||'')+' '+(obs||'')).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+function srvmCatsFor(descriere){
+  const d=(descriere||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
   const out=[];
   const fata=/\bfata\b|\bfront\b/.test(d);
   const spate=/\bspate\b|\brear\b/.test(d);
@@ -3983,10 +3983,32 @@ function srvmCatsFor(descriere, obs){
   if(/distributi|\bcurea|intinzator|\brola\b|\brole\b|fulie/.test(d)) out.push('distributie');
   if(/planetar|\bcutie|ambrei?aj|ambreaj|\bviteze|\bviteza|diferential|flansa|cardan|palier|semiaripa/.test(d)) out.push('transmisie');
   if(/bieleta|bielete|amortizor|telescoap|rulment|\bbrat|\bbrate|bucs|stabilizator|pivot|burduf|directie|antiruliu|pingator|cap(at|ete|etele)? de bara|unghi (de )?fuga|reglaj direct|geometri/.test(d)) out.push('suspensie');
-  if(/\bmotor\b|turbo|injector|\bpompa|admisie|galerie|alternator|\bsenzor|motorina|radiator|antigel|\bcame\b|\bcapac\b|lichid|\bbaterie|\bbateria|particule|\bfap\b|\begr\b|bujii|bujie|turbin|chiul(a|oa)sa|catalizator|\bdpf\b|adblue|debitmetru|intercooler|oring|calculator|\bclima/.test(d)) out.push('motor');
+  if(/\bmotor\b|turbo|injector|\bpompa|admisie|galerie|alternator|\bsenzor|motorina|radiator|antigel|\bcame\b|\bcapac\b|lichid|\bbaterie|\bbateria|particule|\bfap\b|\begr\b|bujii|bujie|turbin|chiul(a|oa)sa|catalizator|\bdpf\b|adblue|debitmetru|intercooler|oring|calculator|\bclima|\bklima|adblu/.test(d)) out.push('motor');
   if(/oglind|parbriz|incuietoare|inchizatoare|\busa\b|\busi\b|\bgeam|\bscaun|motoras|\bfar\b|\bstop\b|spoiler|\bvolan|opritor|\bbutoane|\bsiglă|\bsigla|\bmasca/.test(d)) out.push('caroserie');
-  if(!out.length) out.push('alte');
   return out;
+}
+
+// Despart descrierea pe segmente (virgulă, ;, |, rând nou) — fiecare categorie primește doar segmentul ei
+function srvmSplit(desc){
+  return String(desc||'').split(/\s*[,;|\n]\s*/).map(x=>x.trim()).filter(x=>x.length>0);
+}
+const SRVM_NOISE=/^[\s.\-:()0-9]*((stanga|stinga|dreapta|fata|spate|uzate|interior)|(poling|polling|poline|piling|wasserburg|passau|ruhstorf|rhstorf|eiselfing|km|ioan|mihai|victor|eglsse)\b[\s.\-:()0-9a-z]*)?$/i;
+// Returnează {cats:[...], items:{cat:[segmente]}} pentru o reparație
+function srvmAnalyze(r){
+  const items={}; let any=false;
+  const segs=srvmSplit(r.descriere);
+  const orphans=[];
+  segs.forEach(sg=>{
+    const cs=srvmCatsFor(sg);
+    if(cs.length){ any=true; cs.forEach(k=>{ (items[k]=items[k]||[]).push(sg); }); }
+    else orphans.push(sg);
+  });
+  if(!any){ items.alte=[String(r.descriere||'').trim()||'—']; }
+  else {
+    const real=orphans.filter(o=>o.length>3 && !SRVM_NOISE.test(o));
+    if(real.length) items.alte=real;
+  }
+  return {cats:Object.keys(items), items};
 }
 
 function srvmSetFilter(k){srvmFilter=k;renderSrvmContent(currentSrvMasinaId);}
@@ -4009,7 +4031,10 @@ function renderSrvmContent(masinaId){
 
   // grupare pe categorii
   const byCat={}; SRVM_CATS.forEach(c=>byCat[c.key]=[]);
-  reps.forEach(r=>{ r._cats=srvmCatsFor(r.descriere,r.obs); r._cats.forEach(k=>byCat[k].push(r)); });
+  reps.forEach(r=>{
+    const a=srvmAnalyze(r); r._cats=a.cats;
+    a.cats.forEach(k=>byCat[k].push({r, text:a.items[k].join(' · ')}));
+  });
 
   // chips
   const chips=[`<button class="srvm-chip ${srvmFilter==='all'?'active':''}" onclick="srvmSetFilter('all')">Toate<b>${reps.length}</b></button>`,
@@ -4027,19 +4052,21 @@ function renderSrvmContent(masinaId){
   const showCost=r=>(r.cost&&isSrvSef())?`<div class="srvm-cost srv-cost-display">${Number(r.cost).toFixed(0)} €</div>`:'<div></div>';
   const tagsFor=r=>r._cats.map(k=>{const c=SRVM_CATS.find(x=>x.key===k);return `<span class="srvm-tag">${c?c.chip:k}</span>`;}).join('');
 
-  function rowHtml(r, older, withTags){
+  function rowHtml(it, older, withTags){
+    const r=it.r;
+    if(older) older=older.r;
     let diff='';
     if(older && older.km && r.km && r.km>older.km) diff=`<span class="srvm-diff">+${(r.km-older.km).toLocaleString()} km</span>`;
     return `<div class="srvm-row">
       <div class="srvm-date">${srvmFmtDate(r.data)}</div>
       <div class="srvm-km">${r.km?Number(r.km).toLocaleString()+' km':'—'}${diff}</div>
-      <div class="srvm-desc">${srvmEsc(r.descriere)||'—'}${withTags?tagsFor(r):''}${r.obs?`<div class="srvm-obs">${srvmEsc(r.obs)}</div>`:''}</div>
+      <div class="srvm-desc">${srvmEsc(it.text)||'—'}${withTags?tagsFor(r):''}${(r.obs&&(withTags||r._cats.length===1))?`<div class="srvm-obs">${srvmEsc(r.obs)}</div>`:''}</div>
       ${showCost(r)}
     </div>`;
   }
   function sectionHtml(cat){
     const items=byCat[cat.key]; if(!items.length) return '';
-    const last=items[0];
+    const last=items[0].r;
     const rows=items.map((r,i)=>rowHtml(r,items[i+1],false)).join('');
     return `<div class="srvm-sec">
       <div class="srvm-sec-h">
@@ -4049,7 +4076,7 @@ function renderSrvmContent(masinaId){
   }
 
   if(srvmFilter==='chrono'){
-    sec.innerHTML=`<div class="srvm-sec wide"><div class="srvm-sec-h"><div class="srvm-sec-t">Toate reparațiile <span>(${reps.length})</span></div></div>${reps.map(r=>rowHtml(r,null,true)).join('')}</div>`;
+    sec.innerHTML=`<div class="srvm-sec wide"><div class="srvm-sec-h"><div class="srvm-sec-t">Toate reparațiile <span>(${reps.length})</span></div></div>${reps.map(r=>rowHtml({r,text:r.descriere},null,true)).join('')}</div>`;
   } else if(srvmFilter==='all'){
     sec.innerHTML=SRVM_CATS.map(sectionHtml).join('');
   } else {
