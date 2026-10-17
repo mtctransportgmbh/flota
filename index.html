@@ -217,6 +217,9 @@ body.user-mode .btn-add-log,
 body.user-mode .card-actions {
   display: none !important;
 }
+/* Excepție: cine poate edita stocul (admin, Cristi, Mihai) vede butoanele din Stoc */
+body.stoc-editor #stoc-add-btn{display:inline-block !important;}
+body.stoc-editor #stoc-section .icon-btn{display:inline-block !important;}
 /* Excepție: șefii Service văd butonul de sarcini noi */
 body.srv-sef #srv-add-task-btn {
   display: flex !important;
@@ -1450,6 +1453,14 @@ function isSrvMecanic(){
   if(u) return u.role === 'mecanic';
   // Dacă nu știm cine e, nu blocăm
   return false;
+}
+// Helper: cine poate adăuga/edita stoc piese (admin + Cristi + Mihai)
+function canEditStoc(){
+  if(isAdminUser) return true;
+  if(!currentUser) return false;
+  if(getSrvRole(currentUser.username)==='sef') return true;
+  const n=(currentUser.name||'').trim().toLowerCase();
+  return n==='cristi' || n==='mihai';
 }
 // Helper: e șef în Service?
 function isSrvSef(){
@@ -3576,7 +3587,8 @@ function renderStoc(){
   const sec = document.getElementById('stoc-section');
   if(!sec) return;
   const addBtn = document.getElementById('stoc-add-btn');
-  if(addBtn) addBtn.style.display = isAdminUser ? '' : 'none';
+  document.body.classList.toggle('stoc-editor', canEditStoc());
+  if(addBtn) addBtn.style.display = canEditStoc() ? '' : 'none';
   const q = (document.getElementById('stoc-search')?.value||'').toLowerCase();
   const cat = document.getElementById('stoc-filter-cat')?.value || '';
   let list = stoc.slice();
@@ -3592,7 +3604,7 @@ function renderStoc(){
       const cantColor=s.cantitate===0?'var(--danger)':s.cantitate<=2?'var(--t6)':'var(--accent)';
       const tipColor = s.compatibil==='CRAFTER'?'var(--crafter)':s.compatibil==='T6'?'var(--t6)':'#888';
       const tipLabel = s.compatibil||'Universal';
-      const editBtn=isAdminUser?`<button class="icon-btn" onclick="stocOpenEdit(${s.id})">✎</button>`:'';
+      const editBtn=canEditStoc()?`<button class="icon-btn" onclick="stocOpenEdit(${s.id})">✎</button>`:'';
       return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
           <div style="flex:1;min-width:0">
@@ -3616,7 +3628,7 @@ function renderStoc(){
 }
 
 function stocOpenAdd(){
-  if(!isAdminUser){toast('Doar adminul poate adăuga piese');return;}
+  if(!canEditStoc()){toast('Nu ai drept să adaugi piese');return;}
   editingStocId=null;
   document.getElementById('stoc-modal-title').textContent='Piesă nouă';
   document.getElementById('stoc-delete-btn').style.display='none';
@@ -3627,11 +3639,11 @@ function stocOpenAdd(){
 }
 
 function stocOpenEdit(id){
-  if(!isAdminUser){toast('Doar adminul poate edita');return;}
+  if(!canEditStoc()){toast('Nu ai drept să editezi piese');return;}
   const s=stoc.find(x=>x.id===id);if(!s)return;
   editingStocId=id;
   document.getElementById('stoc-modal-title').textContent='Editează piesă';
-  document.getElementById('stoc-delete-btn').style.display='';
+  document.getElementById('stoc-delete-btn').style.display=isAdminUser?'':'none';
   document.getElementById('stoc-new-nume').value=s.nume||'';
   document.getElementById('stoc-new-cat').value=s.categorie||'Filtre';
   document.getElementById('stoc-new-cant').value=s.cantitate||0;
