@@ -100,6 +100,7 @@ button{font-family:inherit;}
 .tip-CRAFTER{background:rgba(74,158,255,.12);color:var(--crafter);}
 .tip-T6{background:rgba(255,159,74,.12);color:var(--t6);}
 .tip-ELEKTRO{background:rgba(74,255,160,.12);color:var(--elektro);}
+.tip-ALTELE{background:rgba(120,120,120,.15);color:#666;}
 .tip-unknown{background:rgba(85,85,85,.2);color:#555;}
 .card-actions{display:flex;gap:6px;}
 .icon-btn{background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:4px 6px;border-radius:4px;}
@@ -125,7 +126,7 @@ button{font-family:inherit;}
 .disp-col{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
 .disp-header{padding:14px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:baseline;gap:12px;}
 .disp-count{font-family:var(--mono);font-size:30px;font-weight:500;}
-.cnt-CRAFTER{color:var(--crafter);}.cnt-T6{color:var(--t6);}.cnt-ELEKTRO{color:var(--elektro);}
+.cnt-CRAFTER{color:var(--crafter);}.cnt-T6{color:var(--t6);}.cnt-ELEKTRO{color:var(--elektro);}.cnt-ALTELE{color:#666;}
 .disp-tip-label{font-size:13px;font-weight:500;color:var(--text2);}
 .disp-items{padding:6px 0;}
 .disp-item{padding:10px 18px;font-family:var(--mono);font-size:14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
@@ -451,6 +452,7 @@ body.user-mode .log-mobile-card {
   <button class="filter-btn" data-filter="CRAFTER" onclick="setFilter('CRAFTER')">Crafter</button>
   <button class="filter-btn" data-filter="T6" onclick="setFilter('T6')">T6</button>
   <button class="filter-btn" data-filter="ELEKTRO" onclick="setFilter('ELEKTRO')">Elektro</button>
+  <button class="filter-btn" data-filter="ALTELE" onclick="setFilter('ALTELE')">Altele</button>
   <button class="filter-btn" data-filter="DEPOZIT" onclick="setFilter('DEPOZIT')" style="margin-left:6px">Depozit</button>
   <button class="filter-btn" data-filter="EISELFING_LOC" onclick="setFilter('EISELFING_LOC')">Eiselfing</button>
   <button class="filter-btn" data-filter="RUHSTORF_LOC" onclick="setFilter('RUHSTORF_LOC')">Ruhstorf</button>
@@ -515,6 +517,7 @@ body.user-mode .log-mobile-card {
           <option value="CRAFTER">CRAFTER</option>
           <option value="T6">T6</option>
           <option value="ELEKTRO">ELEKTRO</option>
+          <option value="ALTELE">ALTELE</option>
         </select>
         <input id="new-nr" placeholder="nr. înmatriculare">
         <select id="new-sofer-sel"></select>
@@ -721,6 +724,7 @@ body.user-mode .log-mobile-card {
         <option value="CRAFTER">CRAFTER</option>
         <option value="T6">T6</option>
         <option value="ELEKTRO">ELEKTRO</option>
+        <option value="ALTELE">ALTELE</option>
       </select>
     </div>
     <div class="modal-field">
@@ -1084,7 +1088,9 @@ body.user-mode .log-mobile-card {
         <select id="stoc-new-compat">
           <option value="CRAFTER">CRAFTER</option>
           <option value="T6">T6</option>
-          <option value="Universal">Universal (ambele)</option>
+          <option value="ELEKTRO">ELEKTRO</option>
+          <option value="ALTELE">ALTELE</option>
+          <option value="Universal">Universal (toate)</option>
         </select>
       </div>
     </div>
@@ -2428,6 +2434,8 @@ function renderCards(){
     } else if(currentFilter==='RUHSTORF_LOC'){
       // Ruhstorf = mașini la șoferi marcați Ruhstorf
       if(getMasinaLocation(m) !== 'Ruhstorf') return false;
+    } else if(currentFilter==='ALTELE'){
+      if(['CRAFTER','T6','ELEKTRO'].includes(m.tip)) return false;
     } else {
       if(m.tip!==currentFilter) return false;
     }
@@ -2440,7 +2448,7 @@ function renderCards(){
     return;
   }
   sec.innerHTML=filtered.map(m=>{
-    const tip=m.tip||'unknown';
+    const tip=m.tip||'ALTELE';
     const accentColor = tip==='CRAFTER' ? 'var(--crafter)' : tip==='T6' ? 'var(--t6)' : tip==='ELEKTRO' ? 'var(--elektro)' : '#444';
     const dotColor = sc(m.sofer);
     const loc = getMasinaLocation(m);
@@ -2840,8 +2848,10 @@ function cautaAmenda(){
 // ── DISPONIBIL ───────────────────────────────────────────────────────
 function renderDisponibil(){
   const sec=document.getElementById('disp-section');sec.innerHTML='';
-  ['CRAFTER','T6','ELEKTRO'].forEach(tip=>{
-    const d=masini.filter(m=>m.tip===tip&&sk(m.sofer)==='DEPOZIT');
+  const _knownTips=['CRAFTER','T6','ELEKTRO'];
+  const _hasAltele=masini.some(m=>!_knownTips.includes(m.tip));
+  (_hasAltele?[..._knownTips,'ALTELE']:_knownTips).forEach(tip=>{
+    const d=masini.filter(m=>(tip==='ALTELE'?!_knownTips.includes(m.tip):m.tip===tip)&&sk(m.sofer)==='DEPOZIT');
     const col=document.createElement('div');col.className='disp-col';
     col.innerHTML=`<div class="disp-header"><div class="disp-count cnt-${tip}">${d.length}</div><div class="disp-tip-label">${tip} la depozit</div></div>
       <div class="disp-items">${d.length===0?'<div class="disp-empty">Niciuna disponibilă</div>':d.map(m=>`<div class="disp-item"><div class="disp-dot"></div>${m.nr}</div>`).join('')}</div>`;
