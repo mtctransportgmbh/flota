@@ -334,6 +334,9 @@ body.user-mode .log-mobile-card {
       <input id="pin-setup-2" type="password" inputmode="numeric" maxlength="6" class="login-input" placeholder="••••••" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
     </div>
     <button class="login-btn" onclick="pinSetupConfirm()">Salvează PIN</button>
+    <div style="text-align:center;margin-top:14px;font-size:13px">
+      <a onclick="doSwitchUser()" style="color:var(--accent);cursor:pointer;text-decoration:none;font-weight:500">← Schimbă utilizatorul</a>
+    </div>
   </div>
 </div>
 
@@ -348,8 +351,9 @@ body.user-mode .log-mobile-card {
       <input id="pin-login-input" type="password" inputmode="numeric" maxlength="6" class="login-input" placeholder="••••••" oninput="this.value=this.value.replace(/[^0-9]/g,'')" onkeydown="if(event.key==='Enter') pinLoginConfirm()">
     </div>
     <button class="login-btn" onclick="pinLoginConfirm()">Intră</button>
-    <div style="text-align:center;margin-top:14px;font-size:13px">
+    <div style="text-align:center;margin-top:14px;font-size:13px;display:flex;flex-direction:column;gap:8px">
       <a onclick="pinLoginReset()" style="color:var(--text3);cursor:pointer;text-decoration:none">Am uitat PIN-ul — cere resetare</a>
+      <a onclick="doSwitchUser()" style="color:var(--accent);cursor:pointer;text-decoration:none;font-weight:500">← Schimbă utilizatorul</a>
     </div>
   </div>
 </div>
