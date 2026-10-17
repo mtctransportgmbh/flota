@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#0f0f0f">
+<meta name="theme-color" content="#ffffff">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Flota MTC">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -13,10 +13,10 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg:#0f0f0f;--surface:#181818;--surface2:#222;--border:#2a2a2a;--border2:#363636;
-  --text:#e8e8e8;--text2:#888;--text3:#555;--accent:#c8f542;--accent2:#8fbf1f;
-  --crafter:#4a9eff;--t6:#ff9f4a;--elektro:#4affa0;--danger:#ff5a5a;
-  --polling:#4a9eff;--avp:#ff4a8d;--paketshop:#b04aff;--eiselfing:#a78bfa;--out:#ff9f4a;
+  --bg:#ffffff;--surface:#f5f5f5;--surface2:#ebebeb;--border:#e0e0e0;--border2:#d0d0d0;
+  --text:#1a1a1a;--text2:#666;--text3:#999;--accent:#3a7d2c;--accent2:#2d6121;
+  --crafter:#1a6bbf;--t6:#c97000;--elektro:#1a9060;--danger:#c0392b;
+  --polling:#1a6bbf;--avp:#b0006b;--paketshop:#6b00c0;--eiselfing:#5b3bbf;--out:#c97000;
   --font:'IBM Plex Sans',sans-serif;--mono:'IBM Plex Mono',monospace;--radius:8px;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
@@ -32,7 +32,7 @@ button{font-family:inherit;}
 .login-label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px;}
 .login-input{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:15px;padding:12px 14px;outline:none;}
 .login-input:focus{border-color:var(--accent);}
-.login-btn{width:100%;padding:13px;font-size:14px;font-weight:500;border-radius:var(--radius);cursor:pointer;border:none;background:var(--accent);color:#0f0f0f;margin-top:8px;}
+.login-btn{width:100%;padding:13px;font-size:14px;font-weight:500;border-radius:var(--radius);cursor:pointer;border:none;background:var(--accent);color:#fff;margin-top:8px;}
 .login-btn:active{opacity:.85;}
 .login-btn:disabled{opacity:.5;cursor:not-allowed;}
 .login-toggle{text-align:center;margin-top:14px;font-size:13px;color:var(--text2);}
@@ -89,7 +89,7 @@ button{font-family:inherit;}
 .search-wrap input:focus{border-color:var(--accent);}
 .search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px;pointer-events:none;}
 .filter-btn{padding:9px 14px;font-size:12px;font-weight:500;border-radius:var(--radius);cursor:pointer;border:1px solid var(--border2);background:var(--surface);color:var(--text2);transition:all .15s;white-space:nowrap;min-height:38px;}
-.filter-btn.active{background:var(--accent);color:#0f0f0f;border-color:var(--accent);}
+.filter-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 
 /* ── MAIN ──────────────────────────────────────────── */
 .main{padding:16px;padding-bottom:80px;}
@@ -138,7 +138,7 @@ button{font-family:inherit;}
 .log-toolbar input{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:14px;padding:9px 12px;outline:none;flex:1;min-width:160px;}
 .log-toolbar input:focus{border-color:var(--accent);}
 .btn-add-log{padding:10px 16px;font-size:13px;font-weight:500;border-radius:var(--radius);cursor:pointer;border:1px solid var(--accent);background:transparent;color:var(--accent);min-height:40px;}
-.btn-add-log:active{background:var(--accent);color:#0f0f0f;}
+.btn-add-log:active{background:var(--accent);color:#fff;}
 .log-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .log-table{min-width:760px;}
 .log-hdr{display:grid;grid-template-columns:120px 1fr 70px 145px 145px 70px 165px 34px;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border2);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);}
@@ -147,7 +147,7 @@ button{font-family:inherit;}
 .log-time{font-family:var(--mono);font-size:12px;color:var(--text2);}
 .log-badge{font-size:11px;font-weight:500;padding:3px 8px;border-radius:3px;font-family:var(--mono);display:inline-block;}
 .badge-activ{background:rgba(200,245,66,.12);color:var(--accent);}
-.badge-inchis{background:rgba(255,255,255,.05);color:var(--text3);}
+.badge-inchis{background:rgba(0,0,0,.06);color:var(--text3);}
 .log-edit-btn{background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:6px;border-radius:4px;}
 .log-edit-btn:active{color:var(--text);background:var(--surface2);}
 .log-mobile{display:none;}
@@ -166,7 +166,7 @@ button{font-family:inherit;}
 .empty-state{padding:50px 20px;text-align:center;color:var(--text3);font-size:14px;}
 
 /* ── MODAL ─────────────────────────────────────────── */
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:200;align-items:center;justify-content:center;padding:16px;}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;padding:16px;}
 .modal-overlay.open{display:flex;}
 .modal{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:24px;width:460px;max-width:100%;max-height:90vh;overflow-y:auto;}
 .modal-title{font-size:17px;font-weight:500;margin-bottom:6px;}
@@ -178,7 +178,7 @@ button{font-family:inherit;}
 .modal input:focus,.modal select:focus{border-color:var(--accent);}
 .modal-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
 .btn{padding:11px 18px;font-size:13px;font-weight:500;border-radius:var(--radius);cursor:pointer;border:1px solid var(--border2);background:var(--surface);color:var(--text);min-height:42px;flex:1;min-width:100px;}
-.btn-primary{background:var(--accent);color:#0f0f0f;border-color:var(--accent);}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent);}
 .btn-danger{background:transparent;color:var(--danger);border-color:rgba(255,90,90,.4);}
 .btn:active{opacity:.85;}
 
@@ -374,6 +374,7 @@ body.user-mode .log-mobile-card {
       <div class="user-avatar" id="user-avatar">?</div>
       <span id="user-name">—</span>
     </div>
+    <button onclick="doSwitchUser()" title="Schimbă utilizatorul" style="background:none;border:1px solid var(--border2);color:var(--text2);cursor:pointer;font-size:13px;padding:7px 12px;border-radius:var(--radius);font-family:inherit">⇄</button>
     <button onclick="doLogout()" title="Ieși din cont" style="background:none;border:1px solid var(--border2);color:var(--text2);cursor:pointer;font-size:13px;padding:7px 12px;border-radius:var(--radius);font-family:inherit">↪</button>
   </div>
 </div>
@@ -710,6 +711,7 @@ body.user-mode .log-mobile-card {
       <span id="srv-user-name">—</span>
     </div>
     <button onclick="showNotifDiag()" title="Notificări" style="background:none;border:1px solid var(--border2);color:var(--text2);cursor:pointer;font-size:13px;padding:7px 10px;border-radius:var(--radius);font-family:inherit" id="notif-diag-btn">🔔</button>
+    <button onclick="doSwitchUser()" title="Schimbă utilizatorul" style="background:none;border:1px solid var(--border2);color:var(--text2);cursor:pointer;font-size:13px;padding:7px 12px;border-radius:var(--radius);font-family:inherit">⇄</button>
     <button onclick="doLogout()" title="Ieși din cont" style="background:none;border:1px solid var(--border2);color:var(--text2);cursor:pointer;font-size:13px;padding:7px 12px;border-radius:var(--radius);font-family:inherit">↪</button>
   </div>
 </div>
@@ -1747,6 +1749,36 @@ async function doLogout(){
   try{ sessionStorage.clear(); }catch(e){}
   await window.fbHelpers.signOut(window.fbAuth);
   location.reload();
+}
+
+function doSwitchUser(){
+  // Revine la ecranul de selectare utilizator (fără logout din Firebase)
+  // Curăță PIN-ul confirmat al userului curent
+  if(currentUser?.username) _clearPinConfirmed(currentUser.username);
+  currentUser = null;
+
+  // Ascunde ambele aplicații
+  document.getElementById('app').style.display='none';
+  document.getElementById('app-service').style.display='none';
+
+  // Ascunde ecranele de PIN dacă sunt vizibile
+  const pinSetup = document.getElementById('pin-setup-screen');
+  const pinLogin = document.getElementById('pin-login-screen');
+  if(pinSetup) pinSetup.style.display='none';
+  if(pinLogin) pinLogin.style.display='none';
+  _pinPendingUser = null;
+
+  // Arată login-ul cu lista de useri pentru modul curent
+  const loginScreen = document.getElementById('login-screen');
+  if(loginScreen && currentMode){
+    renderLoginUserButtons();
+    loginScreen.style.display='';
+  } else {
+    // Dacă nu știm modul, mergem la selectarea modului
+    currentMode = null;
+    try{ localStorage.removeItem('mtc_selected_mode'); }catch(e){}
+    document.getElementById('mode-select').style.display='';
+  }
 }
 
 // Variabilă globală pentru a ști dacă user-ul curent e admin
@@ -3428,14 +3460,14 @@ async function showNotifBannerIfNeeded(){
 
   const banner = document.createElement('div');
   banner.id = 'notif-banner-srv';
-  banner.style.cssText = 'position:fixed;bottom:80px;left:16px;right:16px;z-index:200;background:#1a2a0a;border:1px solid var(--accent);border-radius:8px;padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 16px rgba(0,0,0,.4)';
+  banner.style.cssText = 'position:fixed;bottom:80px;left:16px;right:16px;z-index:200;background:#f0f8eb;border:1px solid var(--accent);border-radius:8px;padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.12)';
   banner.innerHTML = `
     <div style="font-size:20px">🔔</div>
     <div style="flex:1">
       <div style="font-size:13px;font-weight:500;color:var(--accent)">Activează notificările</div>
       <div style="font-size:12px;color:var(--text2);margin-top:2px">Ca să primești sarcini noi chiar și când aplicația e închisă</div>
     </div>
-    <button onclick="activateNotifFromBanner()" style="background:var(--accent);border:none;color:#0f0f0f;cursor:pointer;font-size:13px;font-weight:500;padding:8px 14px;border-radius:6px;font-family:inherit;white-space:nowrap">Activează</button>
+    <button onclick="activateNotifFromBanner()" style="background:var(--accent);border:none;color:#fff;cursor:pointer;font-size:13px;font-weight:500;padding:8px 14px;border-radius:6px;font-family:inherit;white-space:nowrap">Activează</button>
     <button onclick="document.getElementById('notif-banner-srv').remove()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;padding:4px;line-height:1">✕</button>
   `;
   document.body.appendChild(banner);
@@ -4731,7 +4763,7 @@ function renderSrvTaskuri(){
 
       let actions = '';
       if(canComplete){
-        actions += `<button onclick="srvOpenComplete(${t.id})" style="background:var(--accent);border:none;color:#0f0f0f;cursor:pointer;font-size:12px;padding:8px 14px;border-radius:4px;font-weight:500;font-family:inherit">✓ Marchează finalizată</button>`;
+        actions += `<button onclick="srvOpenComplete(${t.id})" style="background:var(--accent);border:none;color:#fff;cursor:pointer;font-size:12px;padding:8px 14px;border-radius:4px;font-weight:500;font-family:inherit">✓ Marchează finalizată</button>`;
       }
       if(canEdit){
         actions += `<button onclick="srvOpenEditTask(${t.id})" style="background:none;border:1px solid var(--border2);color:var(--text2);cursor:pointer;font-size:12px;padding:7px 12px;border-radius:4px;font-family:inherit">✎ Editează</button>`;
