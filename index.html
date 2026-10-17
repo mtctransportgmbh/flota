@@ -247,6 +247,50 @@ body.user-mode .log-mobile-card {
 @media (min-width:641px){
   .log-mobile{display:none;}
 }
+
+/* ── ISTORIC MAȘINĂ (modal mare) ───────────────────── */
+.srvm-modal{width:min(1320px,97vw);max-width:none;height:min(92vh,1000px);max-height:92vh;display:flex;flex-direction:column;padding:18px 22px;overflow:hidden;}
+.srvm-head{display:flex;align-items:flex-start;gap:16px;margin-bottom:12px;}
+.srvm-head-main{flex:1;min-width:0;}
+.srvm-stats{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end;font-family:var(--mono);font-size:12px;color:var(--text2);}
+.srvm-stat{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;white-space:nowrap;}
+.srvm-x{flex:none;width:40px;height:40px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:18px;cursor:pointer;line-height:1;}
+.srvm-x:hover{background:var(--danger);color:#fff;border-color:var(--danger);}
+.srvm-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+.srvm-chips{display:flex;gap:6px;flex-wrap:wrap;flex:1;min-width:0;}
+.srvm-chip{padding:7px 12px;font-size:12px;font-weight:500;border-radius:20px;cursor:pointer;border:1px solid var(--border2);background:var(--surface);color:var(--text2);white-space:nowrap;font-family:inherit;}
+.srvm-chip b{font-family:var(--mono);font-weight:500;margin-left:4px;color:var(--text3);}
+.srvm-chip:hover{border-color:var(--accent);}
+.srvm-chip.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.srvm-chip.active b{color:#fff;}
+.srvm-search{width:260px;max-width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px;padding:9px 12px;outline:none;}
+.srvm-search:focus{border-color:var(--accent);}
+.srvm-body{flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:12px;align-content:start;padding-right:4px;}
+.srvm-sec{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;min-width:0;}
+.srvm-sec.wide{grid-column:1/-1;}
+.srvm-sec-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap;}
+.srvm-sec-t{font-size:13px;font-weight:600;color:var(--text);}
+.srvm-sec-t span{color:var(--text3);font-weight:400;}
+.srvm-sec-last{font-size:11px;color:var(--text3);font-family:var(--mono);}
+.srvm-row{display:grid;grid-template-columns:84px 118px 1fr auto;gap:10px;align-items:baseline;padding:7px 0;border-top:1px solid var(--border);font-size:13px;}
+.srvm-date{font-family:var(--mono);color:var(--text2);font-size:12px;}
+.srvm-km{font-family:var(--mono);color:var(--text2);font-size:12px;}
+.srvm-diff{display:block;font-size:11px;color:var(--accent);}
+.srvm-desc{color:var(--text);line-height:1.4;min-width:0;overflow-wrap:anywhere;}
+.srvm-obs{font-size:11px;color:var(--text2);font-style:italic;}
+.srvm-tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:10px;background:var(--surface);border:1px solid var(--border2);color:var(--text2);margin-left:4px;white-space:nowrap;}
+.srvm-cost{font-family:var(--mono);color:var(--accent);font-size:12px;}
+.srvm-empty{grid-column:1/-1;padding:40px 10px;text-align:center;color:var(--text3);font-size:14px;}
+.srvm-add{margin-top:12px;border-top:1px solid var(--border);padding-top:10px;max-height:45vh;overflow-y:auto;}
+.srvm-add summary{cursor:pointer;font-size:13px;font-weight:500;color:var(--text);padding:4px 0;}
+@media(max-width:700px){
+  .srvm-modal{height:94vh;max-height:94vh;padding:14px;}
+  .srvm-body{grid-template-columns:1fr;}
+  .srvm-row{grid-template-columns:78px 1fr auto;}
+  .srvm-km{grid-column:2/4;grid-row:1;}
+  .srvm-desc{grid-column:1/-1;}
+  .srvm-search{width:100%;}
+}
 </style>
 </head>
 <body>
@@ -1068,14 +1112,25 @@ body.user-mode .log-mobile-card {
 </div>
 
 <!-- Modal istoric mașină -->
-<div class="modal-overlay" id="srv-modal-istoric-masina">
-  <div class="modal" style="max-width:600px;max-height:85vh;overflow-y:auto">
-    <div class="modal-title" id="srvm-title">Istoric mașină</div>
-    <div class="modal-sub" id="srvm-sub"></div>
-    <div id="srvm-content" style="margin-bottom:16px"></div>
-    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px">
-      <div style="font-size:13px;font-weight:500;margin-bottom:10px;color:var(--text)">+ Adaugă reparație din urmă</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+<div class="modal-overlay" id="srv-modal-istoric-masina" onclick="if(event.target===this)srvmClose()">
+  <div class="modal srvm-modal">
+    <div class="srvm-head">
+      <div class="srvm-head-main">
+        <div class="modal-title" id="srvm-title" style="margin-bottom:2px">Istoric mașină</div>
+        <div class="modal-sub" id="srvm-sub" style="margin-bottom:0"></div>
+      </div>
+      <div class="srvm-stats" id="srvm-stats"></div>
+      <button class="srvm-x" onclick="srvmClose()" title="Închide (Esc)">✕</button>
+    </div>
+    <div class="srvm-toolbar">
+      <div class="srvm-chips" id="srvm-chips"></div>
+      <input id="srvm-search" class="srvm-search" placeholder="caută în istoric..." oninput="srvmSetQuery(this.value)">
+    </div>
+    <div id="srvm-content" class="srvm-body"></div>
+    <details class="srvm-add">
+      <summary>+ Adaugă reparație din urmă</summary>
+      <div style="padding-top:10px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
         <div>
           <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:4px">Data</div>
           <input id="srvm-add-data" type="date" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:13px;padding:8px 10px;outline:none">
@@ -1100,10 +1155,8 @@ body.user-mode .log-mobile-card {
         </div>
       </div>
       <button class="btn btn-primary" onclick="srvmAddRep()" style="width:auto;flex:none">Adaugă reparație</button>
-    </div>
-    <div class="modal-actions" style="margin-top:14px">
-      <button class="btn" onclick="srvmClose()">Închide</button>
-    </div>
+      </div>
+    </details>
   </div>
 </div>
 
@@ -3888,115 +3941,122 @@ function srvOpenIstoricMasina(masinaId){
   const today=new Date();
   document.getElementById('srvm-add-data').value=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
   ['srvm-add-km','srvm-add-desc','srvm-add-cost','srvm-add-obs'].forEach(id=>document.getElementById(id).value='');
+  srvmFilter='all'; srvmQuery='';
+  const _sq=document.getElementById('srvm-search'); if(_sq) _sq.value='';
+  const _ad=document.querySelector('#srv-modal-istoric-masina details.srvm-add'); if(_ad) _ad.open=false;
   renderSrvmContent(masinaId);
   document.getElementById('srv-modal-istoric-masina').classList.add('open');
 }
 
+const SRVM_CATS=[
+  {key:'ulei',label:'🛢 Ulei',chip:'Ulei'},
+  {key:'cauciucuri_fata',label:'⚫ Cauciucuri față',chip:'Cauciucuri față'},
+  {key:'cauciucuri_spate',label:'⚫ Cauciucuri spate',chip:'Cauciucuri spate'},
+  {key:'cauciucuri_alte',label:'⚫ Cauciucuri (față/spate nespecificat)',chip:'Cauciucuri alte'},
+  {key:'frane_fata',label:'🔴 Frâne față (plăcuțe, discuri)',chip:'Frâne față'},
+  {key:'frane_spate',label:'🔴 Frâne spate (plăcuțe, discuri)',chip:'Frâne spate'},
+  {key:'frane_alte',label:'🔴 Frâne (față/spate nespecificat)',chip:'Frâne alte'},
+  {key:'filtre',label:'🧪 Filtre',chip:'Filtre'},
+  {key:'distributie',label:'⛓ Distribuție & curea',chip:'Distribuție'},
+  {key:'transmisie',label:'⚙ Transmisie (planetare, cutie, ambreiaj)',chip:'Transmisie'},
+  {key:'suspensie',label:'🔩 Suspensie & direcție',chip:'Suspensie'},
+  {key:'motor',label:'🔧 Motor, turbo, electrice',chip:'Motor'},
+  {key:'caroserie',label:'🚪 Caroserie, uși, oglinzi, confort',chip:'Caroserie'},
+  {key:'alte',label:'📋 Alte reparații',chip:'Alte reparații'}
+];
+let srvmFilter='all', srvmQuery='';
+
+function srvmEsc(x){return String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function srvmFmtDate(d){return d?String(d).split('-').reverse().join('.'):'—';}
+
+// Detectare robustă: fără diacritice, plural/singular, ordine liberă; o reparație poate fi în mai multe categorii
+function srvmCatsFor(descriere, obs){
+  const d=((descriere||'')+' '+(obs||'')).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  const out=[];
+  const fata=/\bfata\b|\bfront\b/.test(d);
+  const spate=/\bspate\b|\brear\b/.test(d);
+  const pos=(f,sp,alt)=>{ if(fata)out.push(f); if(spate)out.push(sp); if(!fata&&!spate)out.push(alt); };
+  if(/\bulei|\boil\b/.test(d)) out.push('ulei');
+  if(/cauc|anvelop|\broat|\broti\b|\btyre|\btire/.test(d)) pos('cauciucuri_fata','cauciucuri_spate','cauciucuri_alte');
+  if(/placut|\bfr[ai]n|brake|\bdiscur|\bdisc\b|etrier/.test(d)) pos('frane_fata','frane_spate','frane_alte');
+  if(/\bfiltr|polen/.test(d)) out.push('filtre');
+  if(/distributi|\bcurea|intinzator|\brola\b|\brole\b|fulie/.test(d)) out.push('distributie');
+  if(/planetar|\bcutie|ambrei?aj|ambreaj|\bviteze|\bviteza|diferential|flansa|cardan|palier|semiaripa/.test(d)) out.push('transmisie');
+  if(/bieleta|bielete|amortizor|telescoap|rulment|\bbrat|\bbrate|bucs|stabilizator|pivot|burduf|directie|antiruliu|pingator|cap(at|ete|etele)? de bara|unghi (de )?fuga|reglaj direct|geometri/.test(d)) out.push('suspensie');
+  if(/\bmotor\b|turbo|injector|\bpompa|admisie|galerie|alternator|\bsenzor|motorina|radiator|antigel|\bcame\b|\bcapac\b|lichid|\bbaterie|\bbateria|particule|\bfap\b|\begr\b|bujii|bujie|turbin|chiul(a|oa)sa|catalizator|\bdpf\b|adblue|debitmetru|intercooler|oring|calculator|\bclima/.test(d)) out.push('motor');
+  if(/oglind|parbriz|incuietoare|inchizatoare|\busa\b|\busi\b|\bgeam|\bscaun|motoras|\bfar\b|\bstop\b|spoiler|\bvolan|opritor|\bbutoane|\bsiglă|\bsigla|\bmasca/.test(d)) out.push('caroserie');
+  if(!out.length) out.push('alte');
+  return out;
+}
+
+function srvmSetFilter(k){srvmFilter=k;renderSrvmContent(currentSrvMasinaId);}
+function srvmSetQuery(v){srvmQuery=(v||'').trim();renderSrvmContent(currentSrvMasinaId);}
+
 function renderSrvmContent(masinaId){
   const sec=document.getElementById('srvm-content');if(!sec)return;
   const m=masini.find(x=>x.id===masinaId);
-  const reps=reparatii.filter(r=>r.masinaId===masinaId||(m&&r.masinaNr===m.nr)).sort((a,b)=>(a.km||0)-(b.km||0)||(a.data||'').localeCompare(b.data||''));
-  const totalCost=reps.reduce((s,r)=>s+(Number(r.cost)||0),0);
+  const allReps=reparatii.filter(r=>r.masinaId===masinaId||(m&&r.masinaNr===m.nr));
+  const q=srvmQuery.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  const reps=allReps.filter(r=>!q||((r.descriere||'')+' '+(r.obs||'')).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').includes(q))
+    .sort((a,b)=>(b.data||'').localeCompare(a.data||'')||(b.km||0)-(a.km||0));
+  const totalCost=allReps.reduce((s,r)=>s+(Number(r.cost)||0),0);
+  const maxKm=allReps.reduce((s,r)=>Math.max(s,Number(r.km)||0),0);
 
-  if(!reps.length){sec.innerHTML='<div style="font-size:13px;color:var(--text3);padding:14px 0">Nicio reparație înregistrată.</div>';return;}
+  document.getElementById('srvm-stats').innerHTML=
+    `<span class="srvm-stat">${allReps.length} reparații</span>`+
+    (maxKm?`<span class="srvm-stat">ultimul km: ${maxKm.toLocaleString()}</span>`:'')+
+    `<span class="srvm-stat srv-cost-display">Total: ${totalCost.toFixed(2)} €</span>`;
 
-  // Categorii importante — detectate după cuvinte cheie în descriere
-  const CATEGORII = [
-    { key:'ulei', label:'🛢 Schimb ulei', keywords:['ulei','oil'] },
-    { key:'placute_fata', label:'🔴 Plăcuțe față', keywords:['plăcuțe față','placute fata','placuțe față','frână față','frana fata','brake front','față frân','fata frana'] },
-    { key:'placute_spate', label:'🔴 Plăcuțe spate', keywords:['plăcuțe spate','placute spate','placuțe spate','frână spate','frana spate','brake rear','spate frân','spate frana'] },
+  // grupare pe categorii
+  const byCat={}; SRVM_CATS.forEach(c=>byCat[c.key]=[]);
+  reps.forEach(r=>{ r._cats=srvmCatsFor(r.descriere,r.obs); r._cats.forEach(k=>byCat[k].push(r)); });
 
-    { key:'cauciucuri_fata', label:'⚫ Cauciucuri față', keywords:['cauciuc față','cauciuc fata','anvelop față','anvelop fata','roat față','roat fata','față cauciuc','fata cauciuc','front tyre','front tire'] },
-    { key:'cauciucuri_spate', label:'⚫ Cauciucuri spate', keywords:['cauciuc spate','anvelop spate','roat spate','spate cauciuc','rear tyre','rear tire'] },
+  // chips
+  const chips=[`<button class="srvm-chip ${srvmFilter==='all'?'active':''}" onclick="srvmSetFilter('all')">Toate<b>${reps.length}</b></button>`,
+               `<button class="srvm-chip ${srvmFilter==='chrono'?'active':''}" onclick="srvmSetFilter('chrono')">Cronologic</button>`];
+  SRVM_CATS.forEach(c=>{
+    const n=byCat[c.key].length;
+    if(!n && srvmFilter!==c.key) return;
+    chips.push(`<button class="srvm-chip ${srvmFilter===c.key?'active':''}" onclick="srvmSetFilter('${c.key}')">${c.chip}<b>${n}</b></button>`);
+  });
+  document.getElementById('srvm-chips').innerHTML=chips.join('');
 
-  ];
+  if(!allReps.length){sec.innerHTML='<div class="srvm-empty">Nicio reparație înregistrată.</div>';return;}
+  if(!reps.length){sec.innerHTML='<div class="srvm-empty">Nimic găsit pentru „'+srvmEsc(srvmQuery)+'"</div>';return;}
 
-  function matchCat(descriere, keywords){
-    const d=(descriere||'').toLowerCase();
-    return keywords.some(k=>d.includes(k));
-  }
+  const showCost=r=>(r.cost&&isSrvSef())?`<div class="srvm-cost srv-cost-display">${Number(r.cost).toFixed(0)} €</div>`:'<div></div>';
+  const tagsFor=r=>r._cats.map(k=>{const c=SRVM_CATS.find(x=>x.key===k);return `<span class="srvm-tag">${c?c.chip:k}</span>`;}).join('');
 
-  function buildSectiune(label, items){
-    if(!items.length) return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px">
-      <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:6px">${label}</div>
-      <div style="font-size:12px;color:var(--text3);font-style:italic">Nicio înregistrare</div>
-    </div>`;
-
-    // Sortez după km dacă există, altfel după dată
-    const sorted = items.slice().sort((a,b)=>{
-      if(a.km && b.km) return a.km - b.km;
-      return (a.data||'').localeCompare(b.data||'');
-    });
-
-    const rows = sorted.map((r,i)=>{
-      const dt = r.data ? r.data.split('-').reverse().join('.') : '—';
-      const kmStr = r.km ? Number(r.km).toLocaleString()+' km' : '—';
-      // Diferența față de intrarea anterioară
-      let diff = '';
-      if(i>0 && sorted[i-1].km && r.km){
-        const d = r.km - sorted[i-1].km;
-        diff = `<span style="font-size:11px;color:var(--accent);margin-left:8px">+${d.toLocaleString()} km</span>`;
-      } else if(i===0 && sorted.length>1) {
-        diff = `<span style="font-size:11px;color:var(--text3);margin-left:8px">prima</span>`;
-      }
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
-        <div style="font-family:var(--mono);color:var(--text2)">${kmStr}${diff}</div>
-        <div style="color:var(--text3)">${dt}</div>
-        ${r.cost&&isSrvSef()?`<div style="font-family:var(--mono);color:var(--accent)" class="srv-cost-display">${Number(r.cost).toFixed(0)}€</div>`:''}
-      </div>`;
-    }).join('');
-
-    return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px">
-      <div style="font-size:12px;font-weight:500;color:var(--text);margin-bottom:8px">${label} <span style="color:var(--text3);font-weight:400">(${sorted.length})</span></div>
-      ${rows}
+  function rowHtml(r, older, withTags){
+    let diff='';
+    if(older && older.km && r.km && r.km>older.km) diff=`<span class="srvm-diff">+${(r.km-older.km).toLocaleString()} km</span>`;
+    return `<div class="srvm-row">
+      <div class="srvm-date">${srvmFmtDate(r.data)}</div>
+      <div class="srvm-km">${r.km?Number(r.km).toLocaleString()+' km':'—'}${diff}</div>
+      <div class="srvm-desc">${srvmEsc(r.descriere)||'—'}${withTags?tagsFor(r):''}${r.obs?`<div class="srvm-obs">${srvmEsc(r.obs)}</div>`:''}</div>
+      ${showCost(r)}
     </div>`;
   }
-
-  // Separă în categorii
-  const altele = [];
-  const catItems = {ulei:[], placute_fata:[], placute_spate:[], cauciucuri_fata:[], cauciucuri_spate:[]};
-
-  reps.forEach(r=>{
-    let matched = false;
-    for(const cat of CATEGORII){
-      if(matchCat(r.descriere, cat.keywords)){
-        catItems[cat.key].push(r);
-        matched=true;
-        break;
-      }
-    }
-    if(!matched) altele.push(r);
-  });
-
-  let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-    <div style="font-size:13px;color:var(--text2)">${reps.length} reparații total</div>
-    <div style="font-family:var(--mono);font-size:14px;font-weight:500;color:var(--accent)" class="srv-cost-display">Total: ${totalCost.toFixed(2)} €</div>
-  </div>`;
-
-  // Secțiuni importante — "toate" apare doar dacă nu există față/spate specifice
-  CATEGORII.forEach(cat=>{
-
-    html += buildSectiune(cat.label, catItems[cat.key]);
-  });
-
-  // Alte reparații
-  if(altele.length){
-    html += `<div style="font-size:12px;font-weight:500;color:var(--text2);margin:14px 0 8px">📋 Alte reparații (${altele.length})</div>`;
-    html += altele.slice().sort((a,b)=>(b.data||'').localeCompare(a.data||'')).map(r=>{
-      const dt = r.data ? r.data.split('-').reverse().join('.') : '—';
-      return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin-bottom:6px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
-          <div style="font-family:var(--mono);font-size:11px;color:var(--text3)">${dt}${r.km?' · '+Number(r.km).toLocaleString()+' km':''}</div>
-          <div style="font-family:var(--mono);font-size:12px;color:var(--accent)" class="srv-cost-display">${(Number(r.cost)||0).toFixed(0)} €</div>
-        </div>
-        <div style="font-size:13px;color:var(--text)">${r.descriere||'—'}</div>
-        ${r.obs?`<div style="font-size:11px;color:var(--text2);font-style:italic;margin-top:3px">${r.obs}</div>`:''}
-        <div style="font-size:11px;color:var(--text3);margin-top:4px">${r.addedBy||''}</div>
-      </div>`;
-    }).join('');
+  function sectionHtml(cat){
+    const items=byCat[cat.key]; if(!items.length) return '';
+    const last=items[0];
+    const rows=items.map((r,i)=>rowHtml(r,items[i+1],false)).join('');
+    return `<div class="srvm-sec">
+      <div class="srvm-sec-h">
+        <div class="srvm-sec-t">${cat.label} <span>(${items.length})</span></div>
+        <div class="srvm-sec-last">ultima: ${srvmFmtDate(last.data)}${last.km?' · '+Number(last.km).toLocaleString()+' km':''}</div>
+      </div>${rows}</div>`;
   }
 
-  sec.innerHTML=html;
+  if(srvmFilter==='chrono'){
+    sec.innerHTML=`<div class="srvm-sec wide"><div class="srvm-sec-h"><div class="srvm-sec-t">Toate reparațiile <span>(${reps.length})</span></div></div>${reps.map(r=>rowHtml(r,null,true)).join('')}</div>`;
+  } else if(srvmFilter==='all'){
+    sec.innerHTML=SRVM_CATS.map(sectionHtml).join('');
+  } else {
+    const cat=SRVM_CATS.find(c=>c.key===srvmFilter);
+    const html=cat?sectionHtml(cat).replace('class="srvm-sec"','class="srvm-sec wide"'):'';
+    sec.innerHTML=html||'<div class="srvm-empty">Nicio înregistrare în această categorie.</div>';
+  }
 }
 
 function srvmAddRep(){
@@ -4017,6 +4077,7 @@ function srvmAddRep(){
   toast('Reparație adăugată');
 }
 
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && document.getElementById('srv-modal-istoric-masina')?.classList.contains('open')) srvmClose(); });
 function srvmClose(){document.getElementById('srv-modal-istoric-masina').classList.remove('open');currentSrvMasinaId=null;}
 
 // ═════════════════════════════════════════════════════════════
