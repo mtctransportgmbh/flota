@@ -876,6 +876,14 @@ body.user-mode .log-mobile-card {
       </div>
     </div>
 
+    <div class="settings-section">
+      <div class="settings-title">Import Inkpad</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:14px;line-height:1.6">
+        Importă istoricul de reparații din Inkpad (74 mașini, 1383 reparații). Mașinile care nu se potrivesc automat le poți asocia manual sau adăuga ca mașini noi.
+      </div>
+      <button class="btn btn-primary" onclick="openInkpadImport()" style="width:auto;flex:none">📥 Import Inkpad</button>
+    </div>
+
     <!-- Secțiune test notificări -->
     <div class="settings-section" style="border-color:rgba(200,245,66,.2)">
       <div class="settings-title" style="color:var(--accent)">🔔 Diagnosticare & Test notificări</div>
@@ -5459,6 +5467,16 @@ const INKPAD_DATA = {"839":[{"data":"2023-05-10","descriere":"schimbat alternato
 // Mapping curent: inkpadNr -> {type:'match',masinaId} | {type:'new',tip} | {type:'skip'}
 let inkpadMapping = {};
 
+function inkpadNorm(x){ return String(x||'').toUpperCase().replace(/[^A-Z0-9ÄÖÜ]/g,''); }
+function inkpadAutoMatch(inkpadNr){
+  const n = inkpadNorm(inkpadNr);
+  if(!n) return null;
+  return masini.find(m => {
+    const f = inkpadNorm(m.nr);
+    return f === n || f === 'MUIE'+n;
+  }) || null;
+}
+
 function openInkpadImport() {
   inkpadMapping = {};
   renderInkpadModal();
@@ -5483,7 +5501,7 @@ function renderInkpadModal() {
     const action = mapping ? mapping.type : null;
 
     // Auto-match: caută în masini după nr (trim + uppercase)
-    const autoMatch = masini.find(m => m.nr.trim().toUpperCase() === inkpadNr.trim().toUpperCase());
+    const autoMatch = inkpadAutoMatch(inkpadNr);
 
     if(action === 'skip') {
       skipped++;
@@ -5559,7 +5577,7 @@ function renderInkpadModal() {
   // Recalculăm stats
   let mCt=0, uCt=0, sCt=0;
   for(const inkpadNr of inkpadNrs) {
-    const autoMatch = masini.find(m => m.nr.trim().toUpperCase() === inkpadNr.trim().toUpperCase());
+    const autoMatch = inkpadAutoMatch(inkpadNr);
     const eff = inkpadMapping[inkpadNr] || (autoMatch ? {type:'match', masinaId: autoMatch.id} : null);
     if(!eff) uCt++;
     else if(eff.type==='skip') sCt++;
@@ -5604,7 +5622,7 @@ async function doInkpadImport() {
   // Rezolvăm mapping-urile finale
   const finalMapping = {};
   for(const inkpadNr of inkpadNrs) {
-    const autoMatch = masini.find(m => m.nr.trim().toUpperCase() === inkpadNr.trim().toUpperCase());
+    const autoMatch = inkpadAutoMatch(inkpadNr);
     const eff = inkpadMapping[inkpadNr] || (autoMatch ? {type:'match', masinaId: autoMatch.id} : null);
     if(eff) finalMapping[inkpadNr] = eff;
   }
@@ -5667,6 +5685,7 @@ async function doInkpadImport() {
   flotaBackupAuto('Import Inkpad: ' + totalImported + ' reparații, ' + newCarsAdded + ' mașini noi');
   saveToCloud();
   renderAll();
+  try{ if(typeof renderSrvAll==='function') renderSrvAll(); }catch(e){}
   toast(`✓ Import complet: ${totalImported} reparații, ${newCarsAdded} mașini noi`);
 }
 
