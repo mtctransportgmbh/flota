@@ -253,6 +253,37 @@ body.user-mode .log-mobile-card {
   .log-mobile{display:none;}
 }
 
+
+/* ── LISTĂ VERIFICARE CURĂȚENIE (print) ────────────── */
+#print-sheet{display:none;}
+.pc-loc{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--surface);cursor:pointer;}
+.pc-loc input{width:20px;height:20px;accent-color:var(--accent);flex:none;}
+.pc-loc b{font-family:var(--mono);color:var(--text3);font-weight:500;margin-left:auto;}
+@media print{
+  @page{size:A4 portrait;margin:12mm;}
+  body>*:not(#print-sheet){display:none !important;}
+  html,body{background:#fff !important;}
+  #print-sheet{display:block !important;color:#000;font-family:Arial,Helvetica,sans-serif;}
+  .pc-page{page-break-after:always;}
+  .pc-page:last-child{page-break-after:auto;}
+  .pc-h{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px;}
+  .pc-h h1{font-size:20pt;margin:0;}
+  .pc-h .pc-sub{font-size:10pt;color:#333;text-align:right;line-height:1.4;}
+  .pc-fields{display:flex;gap:24px;font-size:11pt;margin-bottom:8px;}
+  .pc-fields span{flex:1;border-bottom:1px solid #000;padding-bottom:2px;}
+  table.pc-t{width:100%;table-layout:fixed;border-collapse:collapse;font-size:11pt;}
+  table.pc-t td{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+  table.pc-t thead{display:table-header-group;}
+  table.pc-t tr{page-break-inside:avoid;}
+  table.pc-t th,table.pc-t td{border:1px solid #000;padding:0 6px;height:10.5mm;vertical-align:middle;}
+  table.pc-t th{background:#e8e8e8;font-size:10pt;text-transform:uppercase;letter-spacing:.04em;height:8mm;}
+  .pc-nr{font-weight:700;font-size:12pt;white-space:nowrap;}
+  .pc-c{text-align:center;}
+  .pc-box{display:inline-block;width:6mm;height:6mm;border:1.4px solid #000;vertical-align:middle;}
+  .pc-obs{}
+  .pc-foot{margin-top:6px;font-size:9pt;color:#333;display:flex;justify-content:space-between;}
+}
+
 /* ── ACTUALIZARE APLICAȚIE (obligatorie) ───────────── */
 .upd-overlay{position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;padding:16px;}
 .upd-box{background:var(--bg);color:var(--text);border:1px solid var(--border2);border-radius:16px;max-width:420px;width:100%;padding:28px 24px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.35);}
@@ -517,6 +548,7 @@ body.user-mode .log-mobile-card {
   <button class="filter-btn" data-filter="EISELFING_LOC" onclick="setFilter('EISELFING_LOC')">Eiselfing</button>
   <button class="filter-btn" data-filter="RUHSTORF_LOC" onclick="setFilter('RUHSTORF_LOC')">Ruhstorf</button>
   <button class="filter-btn" data-filter="PAKETSHOP" onclick="setFilter('PAKETSHOP')">Paketshop</button>
+  <button class="filter-btn" onclick="openPrintCheck()" title="Listă de verificare curat / murdar" style="margin-left:6px">🖨 Listă verificare</button>
 </div>
 
 <div class="main">
@@ -5686,7 +5718,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261019-1110';
+const APP_VERSION='20261019-1356';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
@@ -5812,6 +5844,80 @@ if('serviceWorker' in navigator){
     // fără reîncărcare automată în mijlocul lucrului: doar avertizare
     navigator.serviceWorker.addEventListener('controllerchange', ()=>{ if(!_updInProgress) checkForAppUpdate(true); });
   });
+}
+
+// ── LISTĂ VERIFICARE CURĂȚENIE (print) ────────────────────────────
+const PC_LOCATIONS=['Eiselfing','Ruhstorf','Paketshop'];
+
+// Locația unei mașini pentru verificare: după șoferul atribuit acum
+function pcLocationOf(m){
+  const sf=(m.sofer||'').toString().trim().toUpperCase();
+  if(sf==='PAKETSHOP') return 'Paketshop';
+  if(sf==='EISELFING') return 'Eiselfing';
+  const loc=getMasinaLocation(m);
+  return PC_LOCATIONS.includes(loc)?loc:'';
+}
+function pcCars(loc, includeStricate){
+  return masini
+    .filter(m=>pcLocationOf(m)===loc)
+    .filter(m=>includeStricate || sk(m.sofer)!=='STRICATA')
+    .sort((a,b)=>String(a.nr||'').localeCompare(String(b.nr||''),undefined,{numeric:true}));
+}
+function openPrintCheck(){
+  const inc=document.getElementById('pc-include-stricate').checked;
+  document.getElementById('pc-locs').innerHTML=PC_LOCATIONS.map(loc=>{
+    const n=pcCars(loc,inc).length;
+    return `<label class="pc-loc"><input type="checkbox" class="pc-loc-cb" value="${loc}" ${n?'checked':''} ${n?'':'disabled'}><span style="font-size:15px;font-weight:500">${loc}</span><b>${n} mașini</b></label>`;
+  }).join('');
+  document.getElementById('pc-include-stricate').onchange=openPrintCheckRefresh;
+  document.getElementById('modal-printcheck').classList.add('open');
+}
+function openPrintCheckRefresh(){
+  const checked=[...document.querySelectorAll('.pc-loc-cb:checked')].map(x=>x.value);
+  const inc=document.getElementById('pc-include-stricate').checked;
+  document.getElementById('pc-locs').innerHTML=PC_LOCATIONS.map(loc=>{
+    const n=pcCars(loc,inc).length;
+    return `<label class="pc-loc"><input type="checkbox" class="pc-loc-cb" value="${loc}" ${n&&(checked.includes(loc)||!checked.length)?'checked':''} ${n?'':'disabled'}><span style="font-size:15px;font-weight:500">${loc}</span><b>${n} mașini</b></label>`;
+  }).join('');
+}
+function closePrintCheck(){ document.getElementById('modal-printcheck').classList.remove('open'); }
+
+function pcEsc(x){return String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function pcWeek(d){ // număr săptămână ISO
+  const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const day=t.getUTCDay()||7; t.setUTCDate(t.getUTCDate()+4-day);
+  const y0=new Date(Date.UTC(t.getUTCFullYear(),0,1));
+  return Math.ceil(((t-y0)/86400000+1)/7);
+}
+
+function doPrintCheck(){
+  const locs=[...document.querySelectorAll('.pc-loc-cb:checked')].map(x=>x.value);
+  if(!locs.length){ toast('Alege cel puțin o locație'); return; }
+  const inc=document.getElementById('pc-include-stricate').checked;
+  const now=new Date();
+  const p2=n=>String(n).padStart(2,'0');
+  const gen=`${p2(now.getDate())}.${p2(now.getMonth()+1)}.${now.getFullYear()} ${p2(now.getHours())}:${p2(now.getMinutes())}`;
+  const pages=locs.map(loc=>{
+    const cars=pcCars(loc,inc);
+    const rows=cars.map((m,i)=>{
+      const sf=(m.sofer||'').toString().trim();
+      const su=sf.toUpperCase();
+      const sofer = su==='PAKETSHOP'||su==='EISELFING' ? `— ${loc} —` : (su==='STRICATA' ? 'STRICATĂ' : sf||'—');
+      return `<tr><td style="text-align:center">${i+1}</td><td class="pc-nr">${pcEsc(m.nr)}</td><td>${pcEsc(m.tip||'')}</td><td>${pcEsc(sofer)}</td><td class="pc-c"><span class="pc-box"></span></td><td class="pc-c"><span class="pc-box"></span></td><td class="pc-obs"></td></tr>`;
+    }).join('');
+    return `<div class="pc-page">
+      <div class="pc-h"><h1>Verificare curățenie — ${pcEsc(loc)}</h1>
+        <div class="pc-sub">Săptămâna ${pcWeek(now)} · ${now.getFullYear()}<br>${cars.length} mașini</div></div>
+      <div class="pc-fields"><span>Data verificării:</span><span>Verificat de:</span></div>
+      <table class="pc-t"><colgroup><col style="width:9mm"><col style="width:31mm"><col style="width:26mm"><col style="width:45mm"><col style="width:20mm"><col style="width:20mm"><col></colgroup><thead><tr><th>#</th><th>Nr. auto</th><th>Tip</th><th>Șofer</th><th>Curat</th><th>Murdar</th><th>Obs.</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="pc-foot"><span>MTC Transport — Flotă</span><span>Listă generată: ${gen}</span></div>
+    </div>`;
+  }).join('');
+  let sheet=document.getElementById('print-sheet');
+  if(!sheet){ sheet=document.createElement('div'); sheet.id='print-sheet'; document.body.appendChild(sheet); }
+  sheet.innerHTML=pages;
+  closePrintCheck();
+  setTimeout(()=>{ window.print(); },150);
 }
 
 // ── IMPORT INKPAD ──────────────────────────────────────────────────────
@@ -6043,6 +6149,25 @@ async function doInkpadImport() {
 }
 
 </script>
+
+<!-- ── MODAL: LISTĂ VERIFICARE CURĂȚENIE ─────────────────────── -->
+<div class="modal-overlay" id="modal-printcheck" onclick="if(event.target===this)closePrintCheck()">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-title">🖨 Listă verificare curățenie</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:14px;line-height:1.6">
+      Se printează mașinile pe locații, cu șoferul atribuit acum și coloane de bifat <strong>Curat</strong> / <strong>Murdar</strong>. Câte o pagină pe locație.
+    </div>
+    <div id="pc-locs" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
+    <label class="pc-loc" style="margin-bottom:16px;background:transparent">
+      <input type="checkbox" id="pc-include-stricate">
+      <span style="font-size:13px">Include și mașinile marcate STRICATĂ</span>
+    </label>
+    <div class="modal-actions">
+      <button class="btn" onclick="closePrintCheck()">Anulează</button>
+      <button class="btn btn-primary" onclick="doPrintCheck()">🖨 Printează</button>
+    </div>
+  </div>
+</div>
 
 <!-- ── MODAL: IMPORT INKPAD ──────────────────────────────────────── -->
 <div class="modal-overlay" id="modal-inkpad-import" style="z-index:3000;align-items:flex-start;padding:20px 0;overflow-y:auto">
