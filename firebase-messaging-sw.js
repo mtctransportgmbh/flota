@@ -1,5 +1,5 @@
 // Service Worker unificat — cache + Firebase Messaging
-// MTC Transport v8
+// MTC Transport v9
 
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
@@ -22,7 +22,10 @@ messaging.onBackgroundMessage((payload) => {
   const body = payload.notification?.body || payload.data?.body || '';
 
   // Tag fix bazat pe conținut — previne notificări duplicate
-  const tag = 'mtc-' + btoa(title + body).slice(0, 16);
+  // (btoa crăpa pe emoji/diacritice -> notificarea nu mai apărea; folosim un hash simplu)
+  let h = 0; const src = title + '|' + body + '|' + (payload.data?.taskId || '');
+  for (let i = 0; i < src.length; i++) { h = ((h << 5) - h + src.charCodeAt(i)) | 0; }
+  const tag = 'mtc-' + (h >>> 0).toString(36);
 
   self.registration.showNotification(title, {
     body,
@@ -52,17 +55,17 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 // ── CACHE (PWA offline) ───────────────────────────────────────
-const CACHE = 'flota-v8';
+const CACHE = 'flota-v9';
 const ASSETS = ['./', './index.html', './manifest.json', './config.js'];
 
 self.addEventListener('install', e => {
-  console.log('[SW] Installing v8...');
+  console.log('[SW] Installing v9...');
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
   self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
-  console.log('[SW] Activating v8...');
+  console.log('[SW] Activating v9...');
   e.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
@@ -94,4 +97,4 @@ self.addEventListener('message', e => {
   if (e.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
-console.log('[SW] sw.js v8 unificat activ ✓');
+console.log('[SW] sw.js v9 unificat activ ✓');
