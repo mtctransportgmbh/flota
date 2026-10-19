@@ -280,7 +280,7 @@ body.user-mode .log-mobile-card {
   .pc-nr{font-weight:700;white-space:nowrap;}
   .pc-c{text-align:center;}
   .pc-box{display:inline-block;width:var(--bx,4.4mm);height:var(--bx,4.4mm);border:1.2px solid #000;vertical-align:middle;}
-  .pc-foot{margin-top:2mm;font-size:8pt;color:#333;text-align:right;}
+  .pc-foot{margin-top:1mm;font-size:7pt;color:#333;text-align:right;}
 }
 
 /* ── ACTUALIZARE APLICAȚIE (obligatorie) ───────────── */
@@ -5717,7 +5717,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261019-1404';
+const APP_VERSION='20261019-1413';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
@@ -5897,7 +5897,7 @@ function doPrintCheck(){
   const p2=n=>String(n).padStart(2,'0');
   const gen=`${p2(now.getDate())}.${p2(now.getMonth()+1)}.${now.getFullYear()} ${p2(now.getHours())}:${p2(now.getMinutes())}`;
   // Dimensionare automată: cât mai puține pagini (locațiile se grupează pe aceeași foaie dacă încap)
-  const PAGE_H=266, HEAD_H=15, THEAD_H=6, GAP=6, ROW_MAX=7, ROW_MIN=5;
+  const PAGE_H=252, HEAD_H=15, THEAD_H=6, GAP=6, ROW_MAX=7, ROW_MIN=5;
   const data=locs.map(loc=>({loc,cars:pcCars(loc,inc)}));
   const rhFor=set=>{
     const rows=set.reduce((a,b)=>a+Math.max(b.cars.length,1),0);
