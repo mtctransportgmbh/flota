@@ -1,5 +1,5 @@
 // Service Worker unificat — cache + Firebase Messaging
-// MTC Transport v7
+// MTC Transport v8
 
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
@@ -26,8 +26,8 @@ messaging.onBackgroundMessage((payload) => {
 
   self.registration.showNotification(title, {
     body,
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
+    icon: 'icon-192.png',
+    badge: 'icon-192.png',
     tag, // același tag = înlocuiește notificarea existentă în loc să adauge alta
     renotify: false,
     data: payload.data || {},
@@ -38,30 +38,31 @@ messaging.onBackgroundMessage((payload) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const target = self.registration.scope; // site-ul curent (flota.mtctransportgmbh.de)
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
       for (const client of clientList) {
-        if (client.url.includes('mtctransportgmbh.github.io') && 'focus' in client) {
+        if (client.url.startsWith(target) && 'focus' in client) {
           return client.focus();
         }
       }
-      return clients.openWindow('https://mtctransportgmbh.github.io');
+      return clients.openWindow(target);
     })
   );
 });
 
 // ── CACHE (PWA offline) ───────────────────────────────────────
-const CACHE = 'flota-v7';
+const CACHE = 'flota-v8';
 const ASSETS = ['./', './index.html', './manifest.json', './config.js'];
 
 self.addEventListener('install', e => {
-  console.log('[SW] Installing v7...');
+  console.log('[SW] Installing v8...');
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
   self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
-  console.log('[SW] Activating v7...');
+  console.log('[SW] Activating v8...');
   e.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
@@ -93,4 +94,4 @@ self.addEventListener('message', e => {
   if (e.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
-console.log('[SW] sw.js v7 unificat activ ✓');
+console.log('[SW] sw.js v8 unificat activ ✓');
