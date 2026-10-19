@@ -16,30 +16,23 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// onBackgroundMessage se declanșează DOAR când payload-ul nu are `notification` field
-// (data-only). Dacă serverul trimite și `notification`, Chrome/Android îl afișează
-// automat — nu mai trece prin aici. Păstrăm handler-ul ca fallback.
 messaging.onBackgroundMessage((payload) => {
-  console.log('[SW] onBackgroundMessage primit:', JSON.stringify(payload));
-
-  // Dacă există deja notification în payload (trimis de server), browser-ul
-  // îl afișează singur — nu trebuie să facem nimic. Dar unele browsere tot
-  // trec prin aici, deci verificăm să nu dublăm.
+  console.log('[SW] Background FCM message:', JSON.stringify(payload));
   const title = payload.notification?.title || payload.data?.title || 'MTC Transport';
-  const body  = payload.notification?.body  || payload.data?.body  || '';
+  const body = payload.notification?.body || payload.data?.body || '';
 
-  // Tag unic bazat pe conținut — previne duplicate
-  const tag = 'mtc-' + (payload.data?.type || btoa(title + body).slice(0, 12));
+  // Tag fix bazat pe conținut — previne notificări duplicate
+  const tag = 'mtc-' + btoa(title + body).slice(0, 16);
 
   self.registration.showNotification(title, {
     body,
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    tag,
-    renotify: true,
+    tag, // același tag = înlocuiește notificarea existentă în loc să adauge alta
+    renotify: false,
     data: payload.data || {},
     requireInteraction: true,
-    vibrate: [200, 100, 200],
+    vibrate: [200, 100, 200]
   });
 });
 
@@ -83,7 +76,8 @@ self.addEventListener('fetch', e => {
     return;
   }
   e.respondWith(
-    fetch(e.request)
+    // cache:'no-cache' = ocolește cache-ul HTTP al browserului/CDN (GitHub Pages ține 10 min) -> mereu versiunea nouă
+    fetch(e.request, { cache: 'no-cache' })
       .then(resp => {
         if (e.request.method === 'GET' && resp.ok) {
           const clone = resp.clone();
@@ -99,4 +93,4 @@ self.addEventListener('message', e => {
   if (e.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
-console.log('[SW] sw.js v7 activ ✓');
+console.log('[SW] sw.js v7 unificat activ ✓');

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Flota MTC">
@@ -252,6 +253,40 @@ body.user-mode .log-mobile-card {
   .log-mobile{display:none;}
 }
 
+/* ── ACTUALIZARE APLICAȚIE (obligatorie) ───────────── */
+.upd-overlay{position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;padding:16px;}
+.upd-box{background:var(--bg);color:var(--text);border:1px solid var(--border2);border-radius:16px;max-width:420px;width:100%;padding:28px 24px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.35);}
+.upd-ico{font-size:44px;line-height:1;margin-bottom:10px;}
+.upd-title{font-size:20px;font-weight:600;margin-bottom:8px;}
+.upd-text{font-size:14px;color:var(--text2);line-height:1.55;margin-bottom:18px;}
+.upd-ver{font-family:var(--mono);font-size:12px;color:var(--text3);margin-bottom:18px;}
+.upd-btn{width:100%;min-height:56px;font-size:17px;font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:12px;cursor:pointer;font-family:inherit;}
+.upd-btn:disabled{opacity:.7;cursor:default;}
+.upd-status{font-size:13px;color:var(--text2);margin-top:14px;min-height:18px;}
+.upd-warn{font-size:12px;color:var(--danger);margin-top:12px;line-height:1.5;}
+.app-ver{position:fixed;left:8px;bottom:6px;z-index:60;font-family:var(--mono);font-size:10px;color:var(--text3);background:transparent;border:none;padding:6px 8px;cursor:pointer;opacity:.7;}
+.app-ver:hover{opacity:1;color:var(--accent);}
+
+/* ── TELEFON: header aerisit, butoane mari, taburi lizibile ── */
+@media (max-width:640px){
+  .header{position:relative;padding:12px 14px 12px;gap:10px;}
+  .header-left{width:100%;flex-wrap:wrap;gap:2px 10px;}
+  .logo{font-size:12px;}
+  .header-title{font-size:15px;font-weight:600;}
+  .header-right{width:100%;flex-wrap:wrap;gap:10px;justify-content:space-between;}
+  .header-stats{order:1;width:100%;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:8px;}
+  .hstat{text-align:center;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 4px;}
+  .hstat-val{font-size:19px;}
+  .hstat-label{font-size:10px;margin-top:5px;}
+  .user-chip{order:2;flex:1 1 0;min-width:0;padding:8px 12px;gap:10px;}
+  .user-chip span{display:inline;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;font-weight:500;}
+  .user-avatar{width:28px;height:28px;font-size:12px;}
+  .header-right>button{order:3;flex:none;min-width:48px;min-height:48px;padding:0 !important;font-size:19px !important;}
+  .tabs-bar{position:sticky;top:0;z-index:100;}
+  .tab-btn{padding:15px 15px;font-size:14px;}
+  .main{padding:14px;}
+}
+
 /* ── ISTORIC MAȘINĂ (modal mare) ───────────────────── */
 .srvm-modal{width:min(1320px,97vw);max-width:none;height:min(92vh,1000px);max-height:92vh;display:flex;flex-direction:column;padding:18px 22px;overflow:hidden;}
 .srvm-head{display:flex;align-items:flex-start;gap:16px;margin-bottom:12px;}
@@ -287,13 +322,38 @@ body.user-mode .log-mobile-card {
 .srvm-empty{grid-column:1/-1;padding:40px 10px;text-align:center;color:var(--text3);font-size:14px;}
 .srvm-add{margin-top:12px;border-top:1px solid var(--border);padding-top:10px;max-height:45vh;overflow-y:auto;}
 .srvm-add summary{cursor:pointer;font-size:13px;font-weight:500;color:var(--text);padding:4px 0;}
+.srvm-head-main{order:1;}
+.srvm-stats{order:2;}
+.srvm-x{order:3;}
 @media(max-width:700px){
-  .srvm-modal{height:94vh;max-height:94vh;padding:14px;}
-  .srvm-body{grid-template-columns:1fr;}
-  .srvm-row{grid-template-columns:78px 1fr auto;}
-  .srvm-km{grid-column:2/4;grid-row:1;}
-  .srvm-desc{grid-column:1/-1;}
-  .srvm-search{width:100%;}
+  #srv-modal-istoric-masina{padding:0 !important;align-items:stretch !important;}
+  .srvm-modal{width:100vw;max-width:100vw;height:100vh;height:100dvh;max-height:100dvh;border-radius:0;border:none;padding:12px 12px calc(12px + env(safe-area-inset-bottom,0px));}
+  .srvm-head{flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:center;}
+  .srvm-head-main{flex:1 1 0;min-width:0;}
+  .srvm-head-main .modal-title{font-size:18px;line-height:1.25;}
+  .srvm-head-main .modal-sub{font-size:12px;line-height:1.4;margin-top:2px;}
+  .srvm-x{order:2;width:46px;height:46px;font-size:20px;}
+  .srvm-stats{order:3;flex:1 1 100%;justify-content:flex-start;gap:6px;}
+  .srvm-stat{font-size:12px;padding:6px 10px;}
+  .srvm-toolbar{gap:8px;margin-bottom:10px;}
+  .srvm-chips{flex:1 1 100%;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px;margin:0 -12px;padding-left:12px;padding-right:12px;}
+  .srvm-chips::-webkit-scrollbar{display:none;}
+  .srvm-chip{flex:none;padding:10px 14px;font-size:14px;}
+  .srvm-search{width:100%;font-size:16px;padding:12px 14px;}
+  .srvm-body{grid-template-columns:1fr;gap:12px;padding-right:0;}
+  .srvm-sec{padding:12px 14px;}
+  .srvm-sec-t{font-size:15px;}
+  .srvm-sec-last{font-size:12px;}
+  .srvm-row{grid-template-columns:auto 1fr auto;grid-template-areas:"date km cost" "desc desc desc";gap:4px 12px;padding:11px 0;align-items:baseline;}
+  .srvm-date{grid-area:date;font-size:13px;font-weight:600;color:var(--text);}
+  .srvm-km{grid-area:km;font-size:13px;}
+  .srvm-diff{display:inline;margin-left:8px;font-size:12px;}
+  .srvm-cost{grid-area:cost;font-size:13px;}
+  .srvm-desc{grid-area:desc;font-size:15px;line-height:1.45;}
+  .srvm-obs{font-size:13px;margin-top:2px;}
+  .srvm-tag{font-size:11px;padding:2px 8px;margin-top:4px;}
+  .srvm-add summary{font-size:15px;padding:10px 0;}
+}
 }
 </style>
 </head>
@@ -628,6 +688,17 @@ body.user-mode .log-mobile-card {
       <div id="admin-users-list"></div>
     </div>
 
+
+    <div class="settings-section">
+      <div class="settings-title">Versiune aplicație</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:14px;line-height:1.6">
+        Aplicația verifică singură dacă există o versiune nouă și te anunță. Dacă ceva nu merge sau pare învechit, curăță memoria și reîncarcă.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" onclick="manualUpdateCheck()" style="flex:none;width:auto">🔄 Verifică versiunea</button>
+        <button class="btn" onclick="hardRefreshApp()" style="flex:none;width:auto">🧹 Curăță memoria și reîncarcă</button>
+      </div>
+    </div>
     <div class="settings-section">
       <div class="settings-title">Import Inkpad</div>
       <div style="font-size:12px;color:var(--text3);margin-bottom:14px;line-height:1.6">
@@ -827,7 +898,7 @@ body.user-mode .log-mobile-card {
           <input id="srv-new-data" type="date" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:14px;padding:10px 12px;outline:none">
         </div>
         <div>
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px">Kilometraj (km)</div>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px">Kilometraj (km) *</div>
           <input id="srv-new-km" type="number" placeholder="0" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:14px;padding:10px 12px;outline:none">
         </div>
       </div>
@@ -927,6 +998,17 @@ body.user-mode .log-mobile-card {
       </div>
     </div>
 
+
+    <div class="settings-section">
+      <div class="settings-title">Versiune aplicație</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:14px;line-height:1.6">
+        Aplicația verifică singură dacă există o versiune nouă și te anunță. Dacă ceva nu merge sau pare învechit, curăță memoria și reîncarcă.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" onclick="manualUpdateCheck()" style="flex:none;width:auto">🔄 Verifică versiunea</button>
+        <button class="btn" onclick="hardRefreshApp()" style="flex:none;width:auto">🧹 Curăță memoria și reîncarcă</button>
+      </div>
+    </div>
     <div class="settings-section">
       <div class="settings-title">Import Inkpad</div>
       <div style="font-size:12px;color:var(--text3);margin-bottom:14px;line-height:1.6">
@@ -1145,7 +1227,7 @@ body.user-mode .log-mobile-card {
           <input id="srvm-add-data" type="date" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:13px;padding:8px 10px;outline:none">
         </div>
         <div>
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:4px">Km</div>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:4px">Km *</div>
           <input id="srvm-add-km" type="number" placeholder="0" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:13px;padding:8px 10px;outline:none">
         </div>
       </div>
@@ -1250,13 +1332,14 @@ body.user-mode .log-mobile-card {
 <!-- Modal adăugare cost la reparație finalizată -->
 <div class="modal-overlay" id="srv-modal-add-cost">
   <div class="modal">
-    <div class="modal-title">Adaugă cost reparație</div>
+    <div class="modal-title" id="add-cost-title">Adaugă cost reparație</div>
     <div class="modal-sub" id="add-cost-sub"></div>
     <div class="modal-field">
       <div class="modal-label">Cost (€)</div>
       <input id="add-cost-val" type="number" step="0.01" placeholder="0.00">
     </div>
     <div class="modal-actions">
+      <button class="btn btn-danger" id="add-cost-remove" onclick="removeCost()" style="display:none">Elimină costul</button>
       <button class="btn" onclick="closeAddCostModal()">Anulează</button>
       <button class="btn btn-primary" onclick="saveAddCost()">Salvează</button>
     </div>
@@ -1323,6 +1406,7 @@ body.user-mode .log-mobile-card {
 
 </div>
 
+<button id="app-ver" class="app-ver" onclick="manualUpdateCheck()" title="Verifică dacă există o versiune nouă"></button>
 <div id="toast" class="toast"></div>
 
 <!-- ──────────────────────────────────────────────────────────── -->
@@ -4071,7 +4155,7 @@ function renderSrvmContent(masinaId){
   if(!allReps.length){sec.innerHTML='<div class="srvm-empty">Nicio reparație înregistrată.</div>';return;}
   if(!reps.length){sec.innerHTML='<div class="srvm-empty">Nimic găsit pentru „'+srvmEsc(srvmQuery)+'"</div>';return;}
 
-  const showCost=r=>(r.cost&&isSrvSef())?`<div class="srvm-cost srv-cost-display">${Number(r.cost).toFixed(0)} €</div>`:'<div></div>';
+  const showCost=r=>(r.cost&&isSrvSef())?`<div class="srvm-cost srv-cost-display" onclick="openAddCostModal(${r.id})" title="Modifică sau elimină costul" style="cursor:pointer;border-bottom:1px dashed var(--accent);align-self:start;white-space:nowrap">${Number(r.cost).toFixed(0)} € ✎</div>`:'<div></div>';
   const tagsFor=r=>r._cats.map(k=>{const c=SRVM_CATS.find(x=>x.key===k);return `<span class="srvm-tag">${c?c.chip:k}</span>`;}).join('');
 
   function rowHtml(it, older, withTags){
@@ -4114,6 +4198,7 @@ function srvmAddRep(){
   const data=document.getElementById('srvm-add-data').value;
   const desc=document.getElementById('srvm-add-desc').value.trim();
   if(!data||!desc){toast('Adaugă data și descrierea');return;}
+  if(srvRequireKm(document.getElementById('srvm-add-km').value, m.id, m.nr, 'srvm-add-km') === null) return;
   reparatii.push({
     id:repIdCtr++,masinaId:m.id,masinaNr:m.nr,masinaTip:m.tip,
     data,km:document.getElementById('srvm-add-km').value?Number(document.getElementById('srvm-add-km').value):null,
@@ -4712,6 +4797,9 @@ function openAddCostModal(repId){
   addCostRepId=repId;
   document.getElementById('add-cost-sub').textContent=`${r.masinaNr} · ${r.descriere}`;
   document.getElementById('add-cost-val').value=r.cost||'';
+  const hasCost = r.cost>0;
+  document.getElementById('add-cost-title').textContent = hasCost ? 'Modifică costul reparației' : 'Adaugă cost reparație';
+  document.getElementById('add-cost-remove').style.display = hasCost ? '' : 'none';
   document.getElementById('srv-modal-add-cost').classList.add('open');
 }
 
@@ -4721,7 +4809,23 @@ function saveAddCost(){
   const r=reparatii.find(x=>x.id===addCostRepId);if(!r)return;
   r.cost=parseFloat(document.getElementById('add-cost-val').value)||0;
   r.costAddedBy=currentUser?.name||'unknown';
-  closeAddCostModal();saveToCloud();renderSrvActive();renderSrvIstoric();toast('Cost salvat');
+  closeAddCostModal();saveToCloud();srvRefreshAfterCost();toast('Cost salvat');
+}
+
+function removeCost(){
+  const r=reparatii.find(x=>x.id===addCostRepId);if(!r)return;
+  if(!confirm('Elimini costul de '+(Number(r.cost)||0).toFixed(2)+' € de la această reparație?')) return;
+  r.cost=0;
+  delete r.costAddedBy;
+  r.costRemovedBy=currentUser?.name||'unknown';
+  closeAddCostModal();saveToCloud();srvRefreshAfterCost();toast('Cost eliminat');
+}
+
+function srvRefreshAfterCost(){
+  try{ renderSrvAll(); }catch(e){}
+  try{ renderSrvActive(); renderSrvIstoric(); }catch(e){}
+  try{ if(document.getElementById('srv-tab-masini').style.display!=='none') renderSrvMasini(); }catch(e){}
+  try{ if(currentSrvMasinaId && document.getElementById('srv-modal-istoric-masina').classList.contains('open')) renderSrvmContent(currentSrvMasinaId); }catch(e){}
 }
 
 function showSrvTab(name){
@@ -5030,6 +5134,30 @@ function srvDeleteTask(){
   toast('Sarcină ștearsă');
 }
 
+// Kilometraj obligatoriu pentru mecanici (Ion/Vasile) la finalizare.
+// Returnează numărul de km valid sau null dacă e blocat (mesajul e afișat deja).
+function srvRequireKm(kmStr, masinaId, masinaNr, inputId){
+  const km = Number(kmStr);
+  const fail = msg => {
+    toast(msg);
+    const el = inputId ? document.getElementById(inputId) : null;
+    if(el){ el.style.borderColor='var(--danger)'; el.focus(); }
+    return null;
+  };
+  if(!kmStr || !isFinite(km) || km <= 0) return fail('⚠ Kilometrajul mașinii este obligatoriu');
+  const last = reparatii
+    .filter(r => (r.masinaId===masinaId || r.masinaNr===masinaNr) && r.km)
+    .reduce((mx,r)=>Math.max(mx, Number(r.km)||0), 0);
+  if(last && km < last){
+    if(!confirm(`Ultimul km înregistrat pentru ${masinaNr} este ${last.toLocaleString()}.\nAi introdus ${km.toLocaleString()} (mai mic). Ești sigur că e corect?`)){
+      return fail('Verifică kilometrajul');
+    }
+  }
+  return km;
+}
+
+document.addEventListener('input', e=>{ if(['srv-complete-km','srv-edit-km','srvm-add-km'].includes(e.target.id)) e.target.style.borderColor=''; });
+
 // Marcare task ca finalizat — creează automat reparația
 let completingTaskId = null;
 function srvOpenComplete(id){
@@ -5040,6 +5168,9 @@ function srvOpenComplete(id){
   completingTaskId = id;
   document.getElementById('srv-complete-sub').textContent = `${t.masinaNr} · ${t.descriere}`;
   document.getElementById('srv-complete-km').value = '';
+  document.getElementById('srv-complete-km').style.borderColor = '';
+  const _kmLbl = document.querySelector('#srv-modal-complete .modal-label');
+  if(_kmLbl) _kmLbl.textContent = 'Kilometraj (km) — OBLIGATORIU *';
   document.getElementById('srv-complete-cost').value = '';
   document.getElementById('srv-complete-obs').value = '';
   document.getElementById('srv-modal-complete').classList.add('open');
@@ -5056,6 +5187,9 @@ function srvFinalizeTask(){
   const km = document.getElementById('srv-complete-km').value;
   const cost = document.getElementById('srv-complete-cost').value;
   const obs = document.getElementById('srv-complete-obs').value.trim();
+
+  // Nimeni nu poate finaliza fără kilometraj
+  if(srvRequireKm(km, t.masinaId, t.masinaNr, 'srv-complete-km') === null) return;
 
   t.status = 'done';
   t.completedBy = currentUser?.name || 'unknown';
@@ -5128,6 +5262,8 @@ function srvCardHtml(r, allowEdit){
   const addCostBtn = isSrvSef() && (!r.cost || r.cost===0)
     ? `<button onclick="openAddCostModal(${r.id})" style="background:none;border:1px solid var(--border2);color:var(--text2);cursor:pointer;font-size:11px;padding:4px 8px;border-radius:4px;font-family:inherit">+ cost</button>`
     : '';
+  // Șefii pot modifica / elimina un cost deja adăugat (atinge suma)
+  const editCostAttr = (isSrvSef() && r.cost>0) ? ` onclick="openAddCostModal(${r.id})" title="Modifică sau elimină costul" role="button" style="cursor:pointer;border-bottom:1px dashed var(--accent);"` : '';
   return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;position:relative;overflow:hidden">
     <div style="position:absolute;top:0;left:0;width:3px;height:100%;background:${tipColor}"></div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -5148,7 +5284,7 @@ function srvCardHtml(r, allowEdit){
       </div>
       <div style="display:flex;align-items:center;gap:8px">
         ${addCostBtn}
-        <div style="font-family:var(--mono);font-size:15px;font-weight:500;color:var(--accent);white-space:nowrap" class="srv-cost-display">${(Number(r.cost)||0).toFixed(2)} €</div>
+        <div style="font-family:var(--mono);font-size:15px;font-weight:500;color:var(--accent);white-space:nowrap" class="srv-cost-display"><span${editCostAttr}>${(Number(r.cost)||0).toFixed(2)} €${(isSrvSef() && r.cost>0)?' ✎':''}</span></div>
       </div>
     </div>
   </div>`;
@@ -5220,6 +5356,10 @@ function srvAddReparatie(){
 
   if(!masinaId){ toast('Alege mașina'); return; }
   if(!data){ toast('Adaugă data'); return; }
+  {
+    const _m = masini.find(x=>x.id===masinaId);
+    if(srvRequireKm(km, masinaId, _m ? _m.nr : '', 'srv-new-km') === null) return;
+  }
   if(!descriere){ toast('Adaugă descrierea'); return; }
 
   const m = masini.find(x=>x.id===masinaId);
@@ -5320,6 +5460,9 @@ function srvCloseEdit(){
 function srvSaveEdit(){
   const r = reparatii.find(x=>x.id===editingRepId);
   if(!r) return;
+  if(document.getElementById('srv-edit-status').value==='done' && (r.status!=='done' || r.km)){
+    if(srvRequireKm(document.getElementById('srv-edit-km').value, r.masinaId, r.masinaNr, 'srv-edit-km') === null) return;
+  }
   r.status = document.getElementById('srv-edit-status').value;
   r.data = document.getElementById('srv-edit-data').value;
   const kmVal = document.getElementById('srv-edit-km').value;
@@ -5522,6 +5665,7 @@ window.srvmClose=srvmClose;
 window.openAddCostModal=openAddCostModal;
 window.closeAddCostModal=closeAddCostModal;
 window.saveAddCost=saveAddCost;
+window.removeCost=removeCost;
 // Garanție
 window.garantieOpenAdd=garantieOpenAdd;
 window.garantieOpenEdit=garantieOpenEdit;
@@ -5539,35 +5683,134 @@ document.getElementById('login-password').addEventListener('keypress',e=>{if(e.k
 document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key==='Enter')doAuth();});
 
 // PWA service worker — cu auto-reîmprospătare la versiune nouă
+// ═════════════════════════════════════════════════════════════
+// ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
+// ═════════════════════════════════════════════════════════════
+const APP_VERSION='20261019-1110';
+let _updInProgress=false, _lastIndexCheck=0;
+
+// scoate ?v=... din adresă după o actualizare
+try{ if(/[?&]v=/.test(location.search)) history.replaceState(null,'',location.pathname+location.hash); }catch(e){}
+
+function _updAttempts(sv){ try{ const o=JSON.parse(sessionStorage.getItem('upd_try')||'{}'); return o.v===sv?(o.n||0):0; }catch(e){ return 0; } }
+function _setUpdAttempts(sv,n){ try{ sessionStorage.setItem('upd_try',JSON.stringify({v:sv,n})); }catch(e){} }
+
+async function _fetchServerVersion(force){
+  const base=location.pathname.replace(/[^/]*$/,'');
+  const bust='cb='+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+  try{
+    const r=await fetch(base+'version.json?'+bust,{cache:'no-store'});
+    if(r.ok){ const j=await r.json(); if(j&&j.version) return String(j.version); }
+  }catch(e){}
+  // plan B: citește direct index.html (cel mult o dată la 3 minute)
+  if(!force && Date.now()-_lastIndexCheck<180000) return null;
+  _lastIndexCheck=Date.now();
+  try{
+    const r=await fetch(base+'index.html?'+bust,{cache:'no-store'});
+    if(r.ok){ const t=await r.text(); const m=t.match(/const APP_VERSION\s*=\s*'([^']+)'/); if(m) return m[1]; }
+  }catch(e){}
+  return null;
+}
+
+async function checkForAppUpdate(force){
+  if(_updInProgress) return false;
+  const sv=await _fetchServerVersion(force);
+  if(sv && sv>APP_VERSION){ showUpdateModal(sv); return true; }
+  return false;
+}
+
+async function manualUpdateCheck(){
+  toast('Verific versiunea…');
+  const found=await checkForAppUpdate(true);
+  if(!found) toast('✓ Ai ultima versiune ('+APP_VERSION+')');
+}
+
+function showUpdateModal(sv){
+  let ov=document.getElementById('upd-overlay');
+  const tries=_updAttempts(sv);
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='upd-overlay'; ov.className='upd-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML=`<div class="upd-box">
+    <div class="upd-ico">🔄</div>
+    <div class="upd-title">Versiune nouă disponibilă</div>
+    <div class="upd-text">Aplicația a fost îmbunătățită. Ca să continui, apasă butonul de mai jos — se șterge memoria veche și se încarcă ultima versiune. Datele tale sunt salvate și rămân neschimbate.</div>
+    <div class="upd-ver">versiunea ta: ${APP_VERSION}<br>versiune nouă: ${sv}</div>
+    <button class="upd-btn" id="upd-btn" onclick="forceAppUpdate('${sv}')">Actualizează acum</button>
+    <div class="upd-status" id="upd-status"></div>
+    ${tries>=1?`<div class="upd-warn">${tries>=3
+      ? 'Actualizarea nu reușește. Închide complet aplicația și deschide-o din nou, sau apasă Ctrl+Shift+R (pe telefon: șterge datele site-ului din setările browserului).'
+      : 'Prima încercare nu a ajuns complet. Apasă din nou — facem o curățare completă.'}</div>`:''}
+  </div>`;
+}
+
+async function forceAppUpdate(sv){
+  if(_updInProgress) return;
+  _updInProgress=true;
+  const btn=document.getElementById('upd-btn');
+  const st=document.getElementById('upd-status');
+  const say=t=>{ if(st) st.textContent=t; };
+  const wait=ms=>new Promise(r=>setTimeout(r,ms));
+  if(btn) btn.disabled=true;
+  // 1. lasă salvările în curs să se termine
+  say('Se salvează datele…');
+  try{ await wait(900); for(let i=0;i<24 && typeof isSaving!=='undefined' && isSaving;i++) await wait(250); }catch(e){}
+  const n=_updAttempts(sv)+1; _setUpdAttempts(sv,n);
+  // 2. șterge toate cache-urile aplicației
+  say('Se șterge memoria veche…');
+  try{ if(window.caches){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); } }catch(e){}
+  // 3. service worker: update (prima dată) / dezinstalare completă (a 2-a încercare)
+  try{
+    if('serviceWorker' in navigator){
+      const regs=await navigator.serviceWorker.getRegistrations();
+      if(n>=2) await Promise.all(regs.map(r=>r.unregister().catch(()=>{})));
+      else{
+        await Promise.all(regs.map(r=>r.update().catch(()=>{})));
+        regs.forEach(r=>{ if(r.waiting) r.waiting.postMessage('SKIP_WAITING'); });
+      }
+    }
+  }catch(e){}
+  // 4. reîncarcă cu adresă unică (ocolește cache-ul browserului)
+  say('Se încarcă versiunea nouă…');
+  await wait(400);
+  location.replace(location.pathname+'?v='+encodeURIComponent(sv)+'&t='+Date.now());
+}
+
+// Buton din Admin: curățare completă chiar dacă versiunea pare aceeași
+function hardRefreshApp(){
+  if(!confirm('Șterg memoria aplicației și reîncarc? (datele din cont rămân)')) return;
+  _setUpdAttempts(APP_VERSION,1);
+  forceAppUpdate(APP_VERSION);
+}
+
+(function(){
+  const pill=document.getElementById('app-ver');
+  if(pill) pill.textContent='v'+APP_VERSION+' ⟳';
+  // verificări: la deschidere, la 60 s, la revenirea în aplicație, la reconectare
+  setTimeout(()=>checkForAppUpdate(true),1500);
+  setInterval(()=>checkForAppUpdate(false),60000);
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') checkForAppUpdate(true); });
+  window.addEventListener('online',()=>checkForAppUpdate(true));
+  window.addEventListener('focus',()=>checkForAppUpdate(false));
+})();
+
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('sw.js').then(reg=>{
-      // Verifică update imediat la deschidere
       reg.update();
-
-      // Verifică update la fiecare 30 secunde — garantează că vede versiunea nouă
       setInterval(()=>reg.update(), 30000);
-
-      // Când vine versiune nouă, instalează imediat fără să aștepte
+      // service worker nou găsit -> verificăm imediat versiunea și arătăm avertizarea
       reg.addEventListener('updatefound', ()=>{
-        const newWorker = reg.installing;
-        if(newWorker){
-          newWorker.addEventListener('statechange', ()=>{
-            if(newWorker.state === 'installed' && navigator.serviceWorker.controller){
-              newWorker.postMessage('SKIP_WAITING');
-            }
-          });
-        }
+        const w=reg.installing;
+        if(w) w.addEventListener('statechange', ()=>{
+          if(w.state==='installed' && navigator.serviceWorker.controller) checkForAppUpdate(true);
+        });
       });
     }).catch(()=>{});
-
-    // Când service worker-ul nou ia controlul, reîncarcă automat
-    let reloading=false;
-    navigator.serviceWorker.addEventListener('controllerchange', ()=>{
-      if(reloading) return;
-      reloading=true;
-      window.location.reload();
-    });
+    // fără reîncărcare automată în mijlocul lucrului: doar avertizare
+    navigator.serviceWorker.addEventListener('controllerchange', ()=>{ if(!_updInProgress) checkForAppUpdate(true); });
   });
 }
 
