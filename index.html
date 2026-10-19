@@ -1452,7 +1452,7 @@ body.user-mode .log-mobile-card {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, setPersistence, browserLocalPersistence }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, onSnapshot, enableIndexedDbPersistence }
+import { getFirestore, doc, setDoc, getDoc, onSnapshot, runTransaction, enableIndexedDbPersistence }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getMessaging, getToken, onMessage }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
@@ -1493,10 +1493,14 @@ if (!firebaseConfig || !firebaseConfig.apiKey) {
     signOut,
     onAuth: onAuthStateChanged,
     updateProfile,
-    setDoc,
+    rawSetDoc: setDoc,
+    // Scriere cu îmbinare (merge) — nu mai suprascrie modificările altor useri
+    setDoc: (ref, payload) => window.mergeSetDoc(ref, payload),
+    runTransaction,
     getDoc,
     onSnapshot
   };
+  window.fbDb = db;
 
   // Inițializare Messaging pentru notificări push
   try {
@@ -2152,7 +2156,8 @@ function startSync(){
   window.fbHelpers.onSnapshot(window.fbDocRef, (snap)=>{
     if(snap.exists()){
       const d=snap.data();
-      if(isSaving){ isSaving=false; return; }
+      // Cât timp avem modificări nesalvate, nu suprascriem memoria locală (salvarea face merge)
+      if(savePending || isSaving){ document.getElementById('loading').style.display='none'; return; }
       lastSnapshotData=JSON.stringify(d);
       hydrateFromCloud(d);
     } else {
@@ -2270,6 +2275,7 @@ function hydrateFromCloud(d){
   flotaBackupIdCtr = d.flotaBackupIdCtr || 1;
   garantii = (d.garantii||[]).map(g=>({...g}));
   garantiiIdCtr = d.garantiiIdCtr || 1;
+  _setBaseline(_serialLocal());
 
   // Verifică forced logout pentru user-ul curent
   if(currentUser && window._currentForcedLogouts[currentUser.username]){
@@ -2503,6 +2509,99 @@ function seedInitialData(){
   logIdCtr=1;
 }
 
+
+// ── ÎMBINARE (MERGE) LA SALVARE ──────────────────────────────────────
+// Problemă rezolvată: fiecare dispozitiv scria TOT documentul din memoria lui, deci un
+// telefon cu date vechi ștergea sarcinile noi / readuce sarcinile șterse. Acum, la fiecare
+// salvare, citim versiunea din cloud și aplicăm DOAR ce s-a schimbat local față de ultima
+// versiune primită (adăugat / modificat / șters).
+const _KEYED={masini:'id',log:'id',reparatii:'id',taskuri:'id',stoc:'id',garantii:'id',backupuri:'id',flotaBackupuri:'id',soferi:'name',knownUsers:'username'};
+const _CTR={masini:'carIdCtr',log:'logIdCtr',reparatii:'repIdCtr',taskuri:'taskIdCtr',stoc:'stocIdCtr',garantii:'garantiiIdCtr',backupuri:'backupIdCtr',flotaBackupuri:'flotaBackupIdCtr'};
+let _base={};   // ultima stare cunoscută din cloud: {cheie: Map(id -> json)} + admins/forcedLogouts
+function _st(o){
+  return JSON.stringify(o,(k,v)=>(v&&typeof v==='object'&&!Array.isArray(v))?Object.keys(v).sort().reduce((a,x)=>(a[x]=v[x],a),{}):v);
+}
+function _kf(x,idf){ return typeof x==='string'?x:(x?x[idf]:undefined); }
+function _serialLocal(){
+  return {
+    masini, soferi,
+    log: log.map(l=>({...l, preluat:l.preluat?l.preluat.toISOString():null, restituit:l.restituit?l.restituit.toISOString():null})),
+    reparatii, taskuri, stoc, garantii,
+    backupuri: backupuri.map(b=>({id:b.id,timestamp:b.timestamp,triggerBy:b.triggerBy,size:b.size||0})),
+    flotaBackupuri: flotaBackupuri.map(b=>({id:b.id,timestamp:b.timestamp,triggerBy:b.triggerBy,size:b.size||0,snapshot:b.snapshot||''})),
+    knownUsers, admins, forcedLogouts: window._currentForcedLogouts||{}
+  };
+}
+function _setBaseline(doc){
+  const nb={};
+  Object.keys(_KEYED).forEach(n=>{
+    const m=new Map();
+    (doc[n]||[]).forEach(x=>{ const k=_kf(x,_KEYED[n]); if(k!==undefined) m.set(k,_st(x)); });
+    nb[n]=m;
+  });
+  nb.admins=new Set(doc.admins||[]);
+  nb.forcedLogouts=JSON.parse(JSON.stringify(doc.forcedLogouts||{}));
+  _base=nb;
+}
+function _mergeKeyed(name, remote, local){
+  const idf=_KEYED[name];
+  if((local||[]).some(x=>_kf(x,idf)===undefined)) return local; // fără chei — nu putem îmbina
+  const baseM=_base[name]||new Map();
+  const out=new Map();
+  (remote||[]).forEach(x=>{ const k=_kf(x,idf); if(k!==undefined) out.set(k,x); });
+  const localKeys=new Set();
+  (local||[]).forEach(x=>{
+    const k=_kf(x,idf); localKeys.add(k);
+    const b=baseM.get(k);
+    if(b===undefined){
+      if(out.has(k) && _st(out.get(k))!==_st(x) && idf==='id'){
+        // același id creat simultan pe alt dispozitiv — dăm alt id
+        const ids=[...out.keys(),...localKeys].filter(n=>typeof n==='number');
+        const nid=Math.max(0,...ids)+1; out.set(nid,{...x,[idf]:nid}); localKeys.add(nid);
+      } else out.set(k,x);
+    } else if(b!==_st(x)) out.set(k,x);
+  });
+  baseM.forEach((_,k)=>{ if(!localKeys.has(k)) out.delete(k); });
+  return [...out.values()];
+}
+function _mergeDoc(remote, payload){
+  const merged={...remote, ...payload};
+  Object.keys(_KEYED).forEach(n=>{
+    if(!(n in payload)) return;
+    merged[n]=_mergeKeyed(n, remote[n]||[], payload[n]||[]);
+    const c=_CTR[n];
+    if(c && _KEYED[n]==='id'){
+      const mx=Math.max(0,...merged[n].map(x=>typeof x.id==='number'?x.id:0));
+      merged[c]=Math.max(remote[c]||1, payload[c]||1, mx+1);
+    }
+  });
+  if('admins' in payload){
+    const set=new Set(remote.admins||[]);
+    (payload.admins||[]).forEach(a=>set.add(a));
+    (_base.admins||new Set()).forEach(a=>{ if(!(payload.admins||[]).includes(a)) set.delete(a); });
+    merged.admins=[...set];
+  }
+  if('forcedLogouts' in payload){
+    const fl={...(remote.forcedLogouts||{})}; const bf=_base.forcedLogouts||{};
+    Object.keys(payload.forcedLogouts||{}).forEach(k=>{ if(bf[k]!==payload.forcedLogouts[k]) fl[k]=payload.forcedLogouts[k]; });
+    merged.forcedLogouts=fl;
+  }
+  return merged;
+}
+window.mergeSetDoc=async function(ref, payload){
+  const H=window.fbHelpers;
+  await H.runTransaction(window.fbDb, async tx=>{
+    const snap=await tx.get(ref);
+    const remote=snap.exists()?snap.data():{};
+    tx.set(ref, _mergeDoc(remote, payload));
+  });
+  // baseline = ce știm acum că e în cloud din partea noastră
+  const nb=_serialLocal(); Object.keys(payload).forEach(k=>{ if(k in nb) nb[k]=payload[k]; });
+  _setBaseline(nb);
+};
+
+let savePending=false;
+let _saveRetryTimer=null;
 let saveTimer=null;
 function saveToCloud(){
   // Protecție: nu salva dacă mașinile sunt goale accidental
@@ -2512,8 +2611,9 @@ function saveToCloud(){
     return;
   }
   clearTimeout(saveTimer);
+  savePending=true;
   saveTimer=setTimeout(async ()=>{
-    isSaving=true;
+    savePending=false; isSaving=true;
     const payload={
       masini,
       soferi,
@@ -2544,10 +2644,14 @@ function saveToCloud(){
     };
     try{
       await window.fbHelpers.setDoc(window.fbDocRef, payload);
+      isSaving=false;
     } catch(e){
       console.error('Save failed:', e);
-      toast('Salvare eșuată — '+e.message);
       isSaving=false;
+      const offline = !navigator.onLine || /offline|unavailable|network/i.test(e.message||'');
+      toast(offline ? 'Fără conexiune — salvarea se reia automat' : 'Salvare eșuată — '+e.message+' (reîncerc)');
+      clearTimeout(_saveRetryTimer);
+      _saveRetryTimer=setTimeout(()=>saveToCloud(), 8000);
     }
   }, 250);
 }
@@ -5768,7 +5872,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261019-144330';
+const APP_VERSION='20261019-150143';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
