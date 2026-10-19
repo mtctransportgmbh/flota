@@ -9,7 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Flota MTC">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>FLOTA MTC TRANSPORT — Gestiune auto</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -391,6 +392,7 @@ body.user-mode .log-mobile-card {
 
 <!-- ── LOADING SCREEN ─────────────────────────────────────────── -->
 <div id="loading" class="loading">
+  <img src="icon-192.png" alt="MTC" width="96" height="96" style="border-radius:22px;box-shadow:0 6px 24px rgba(18,24,38,.25)">
   <div class="spinner"></div>
   <div style="font-size:13px;color:var(--text2);font-family:var(--mono)">se conectează...</div>
 </div>
@@ -5766,7 +5768,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261019-143956';
+const APP_VERSION='20261019-144330';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
