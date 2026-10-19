@@ -1588,6 +1588,11 @@ function canEditStoc(){
 function isEiselfingUser(){
   return !!currentUser && !isAdminUser && currentUser.username==='eiselfing';
 }
+function visSoferi(){
+  const l=soferi.map(s => typeof s === 'string' ? {name:s, location:''} : s);
+  return isEiselfingUser() ? l.filter(s=>s.location==='Eiselfing') : l;
+}
+function visibleNrSet(){ return new Set(visibleMasini().map(m=>(m.nr||'').toUpperCase())); }
 function visibleMasini(){
   return isEiselfingUser() ? masini.filter(m=>pcLocationOf(m)==='Eiselfing') : masini;
 }
@@ -1598,7 +1603,7 @@ function isSrvSef(){
   return !isSrvMecanic();
 }
 
-const SPECIALS=['DEPOZIT','POLLING','EISELFING','AVP','PAKETSHOP','STRICATA'];
+const SPECIALS=['DEPOZIT','POLLING','EISELFING','AVP','PAKETSHOP','STRICATA','DHL'];
 
 // ── HELPERS ──────────────────────────────────────────────────────────
 function sk(sofer){
@@ -1608,12 +1613,13 @@ function sk(sofer){
   if(u==='POLLING') return 'POLLING';
   if(u==='EISELFING') return 'EISELFING';
   if(u==='AVP') return 'AVP';
+  if(u==='DHL') return 'DHL';
   if(u==='PAKETSHOP') return 'PAKETSHOP';
   if(u==='STRICATA') return 'STRICATA';
   return 'OUT';
 }
 function sc(sofer){
-  const m={DEPOZIT:'#c8f542',POLLING:'#4a9eff',EISELFING:'#a78bfa',AVP:'#ff4a8d',PAKETSHOP:'#b04aff',STRICATA:'#ff5a5a',OUT:'#ff9f4a',NONE:'#444'};
+  const m={DEPOZIT:'#c8f542',POLLING:'#4a9eff',EISELFING:'#a78bfa',AVP:'#ff4a8d',DHL:'#f5b400',PAKETSHOP:'#b04aff',STRICATA:'#ff5a5a',OUT:'#ff9f4a',NONE:'#444'};
   return m[sk(sofer)]||'#444';
 }
 const initials=n=>{const p=(n||'').split(' ').filter(Boolean);return p.length>=2?(p[0][0]+p[p.length-1][0]).toUpperCase():(p[0]||'?').slice(0,2).toUpperCase();};
@@ -1627,6 +1633,8 @@ function getMasinaLocation(m){
   const sofer = m.sofer || '';
   // Categoria specială EISELFING = sediul Eiselfing
   if(sofer.toUpperCase() === 'EISELFING') return 'Eiselfing';
+  // Mașină trimisă la DHL din Eiselfing rămâne a Eiselfing-ului
+  if(sofer.toUpperCase() === 'DHL') return m.dhlOrigin==='Eiselfing' ? 'Eiselfing' : '';
   // Caut șoferul în listă
   const s = soferi.find(x => x.name === sofer);
   if(s) return s.location || '';
@@ -1640,7 +1648,7 @@ function getSoferiNames(){
 
 function buildOpts(sel, filter=''){
   const q = filter.toLowerCase();
-  const soferiList = soferi.map(s => typeof s === 'string' ? {name:s, location:''} : s);
+  const soferiList = visSoferi();
   const eisel = soferiList.filter(s=>s.location==='Eiselfing').sort((a,b)=>a.name.localeCompare(b.name));
   const ruhst = soferiList.filter(s=>s.location==='Ruhstorf').sort((a,b)=>a.name.localeCompare(b.name));
   const paket = soferiList.filter(s=>s.location==='Paketshop').sort((a,b)=>a.name.localeCompare(b.name));
@@ -1653,6 +1661,13 @@ function buildOpts(sel, filter=''){
       '<option disabled>Niciun rezultat</option>';
   }
 
+  if(isEiselfingUser()){
+    let h = `<option value="EISELFING"${sel==='EISELFING'?' selected':''}>EISELFING (sediu)</option>`+
+      `<option value="DHL"${sel==='DHL'?' selected':''}>🚚 DHL</option>`+
+      `<option value="STRICATA"${sel==='STRICATA'?' selected':''}>🔧 STRICATĂ</option>`;
+    if(eisel.length){ h += `<option disabled>── EISELFING ──</option>` + eisel.map(s=>`<option value="${s.name}"${s.name===sel?' selected':''}>${s.name}</option>`).join(''); }
+    return h;
+  }
   let html = `<option value="DEPOZIT"${sel==='DEPOZIT'?' selected':''}>DEPOZIT</option>`+
     `<option value="POLLING"${sel==='POLLING'?' selected':''}>POLLING</option>`+
     `<option value="AVP"${sel==='AVP'?' selected':''}>AVP</option>`+
@@ -2335,7 +2350,7 @@ function updateAdminUI(){
   const _eis=isEiselfingUser();
   document.querySelectorAll('.tabs-bar .tab-btn').forEach(b=>{
     const oc=b.getAttribute('onclick')||'';
-    if(_eis) b.style.display = (oc.includes("'masini'")||oc.includes("'soferi'")) ? '' : 'none';
+    if(_eis) b.style.display = (oc.includes("'masini'")||oc.includes("'soferi'")||oc.includes("'disponibil'")||oc.includes("'log'")||oc.includes("'amenda'")) ? '' : 'none';
     else if(!b.id && b.textContent.trim()!=='Setări') b.style.display='';
   });
   document.querySelectorAll('#toolbar-masini .filter-btn').forEach(b=>{
@@ -2683,9 +2698,11 @@ function cardDriverRenderList(carId, q, current){
   const listEl = document.getElementById('cdl-'+carId);
   if(!listEl) return;
   const ql = q.toLowerCase();
-  const soferiList = soferi.map(s=> typeof s==='string'?{name:s,location:''}:s);
+  const soferiList = visSoferi();
 
-  const specials = [
+  const specials = isEiselfingUser() ? [
+    {name:'EISELFING',label:'EISELFING (sediu)'},{name:'DHL',label:'🚚 DHL'},{name:'STRICATA',label:'🔧 STRICATĂ'}
+  ] : [
     {name:'DEPOZIT'},{name:'POLLING'},{name:'AVP'},
     {name:'STRICATA',label:'🔧 STRICATĂ'},{name:'',label:'— nealocat —'}
   ];
@@ -2797,6 +2814,7 @@ function confirmDriver(){
   }
 
   m.sofer = newDriver;
+  if(newDriver==='DHL' && isEiselfingUser()) m.dhlOrigin='Eiselfing'; else delete m.dhlOrigin;
   closeModalDriver();
   saveToCloud();
   renderAll();
@@ -2810,7 +2828,9 @@ function confirmDriver(){
 function renderLog(){
   const q=(document.getElementById('log-search')?.value||'').toLowerCase();
   const sorted=log.slice().sort((a,b)=>(b.preluat?.getTime()||0)-(a.preluat?.getTime()||0));
+  const _vn=isEiselfingUser()?visibleNrSet():null;
   const filtered=sorted.filter(l=>{
+    if(_vn && !_vn.has((l.nr||'').toUpperCase())) return false;
     if(!q) return true;
     return (l.nr||'').toLowerCase().includes(q) || (l.sofer||'').toLowerCase().includes(q);
   });
@@ -2915,7 +2935,7 @@ function deleteLog(){
 }
 
 function openAddLog(){
-  document.getElementById('al-nr').innerHTML=masini.map(m=>`<option value="${m.nr}">${m.nr} (${m.tip})</option>`).join('');
+  document.getElementById('al-nr').innerHTML=visibleMasini().map(m=>`<option value="${m.nr}">${m.nr} (${m.tip})</option>`).join('');
   document.getElementById('al-sofer').innerHTML=buildOpts('');
   document.getElementById('al-preluat').value=fmtDtInput(new Date());
   document.getElementById('al-restituit').value='';
@@ -2957,6 +2977,7 @@ function cautaAmenda(){
   const dtStr=document.getElementById('amenda-dt').value;
   const res=document.getElementById('amenda-rezultat');
   if(!nr||!dtStr){res.innerHTML='<div style="color:var(--text3);font-size:13px">Completează ambele câmpuri.</div>';return;}
+  if(isEiselfingUser() && !visibleNrSet().has(nr)){res.innerHTML='<div style="color:var(--text3);font-size:13px">Mașina nu este atribuită la Eiselfing.</div>';return;}
   const dt=new Date(dtStr);
   const hits=log.filter(l=>{
     if((l.nr||'').toUpperCase()!==nr) return false;
@@ -2987,11 +3008,13 @@ function cautaAmenda(){
 function renderDisponibil(){
   const sec=document.getElementById('disp-section');sec.innerHTML='';
   const _knownTips=['CRAFTER','T6','ELEKTRO'];
+  const _eis=isEiselfingUser();
+  const _dispKey=_eis?'EISELFING':'DEPOZIT';
   const _hasAltele=masini.some(m=>!_knownTips.includes(m.tip));
   (_hasAltele?[..._knownTips,'ALTELE']:_knownTips).forEach(tip=>{
-    const d=masini.filter(m=>(tip==='ALTELE'?!_knownTips.includes(m.tip):m.tip===tip)&&sk(m.sofer)==='DEPOZIT');
+    const d=masini.filter(m=>(tip==='ALTELE'?!_knownTips.includes(m.tip):m.tip===tip)&&sk(m.sofer)===_dispKey);
     const col=document.createElement('div');col.className='disp-col';
-    col.innerHTML=`<div class="disp-header"><div class="disp-count cnt-${tip}">${d.length}</div><div class="disp-tip-label">${tip} la depozit</div></div>
+    col.innerHTML=`<div class="disp-header"><div class="disp-count cnt-${tip}">${d.length}</div><div class="disp-tip-label">${tip} ${_eis?'la Eiselfing (fără șofer)':'la depozit'}</div></div>
       <div class="disp-items">${d.length===0?'<div class="disp-empty">Niciuna disponibilă</div>':d.map(m=>`<div class="disp-item"><div class="disp-dot"></div>${m.nr}</div>`).join('')}</div>`;
     sec.appendChild(col);
   });
@@ -2999,6 +3022,7 @@ function renderDisponibil(){
   // Secțiunea Paketshop — mașini cu sofer=PAKETSHOP + șoferi atribuiți
   const paketshopSec = document.getElementById('paketshop-section');
   if(!paketshopSec) return;
+  if(_eis){ paketshopSec.innerHTML=''; return; }
   const pMasini = masini.filter(m=>sk(m.sofer)==='PAKETSHOP').sort((a,b)=>(a.nr||'').localeCompare(b.nr||''));
   if(!pMasini.length){ paketshopSec.innerHTML=''; return; }
 
@@ -5578,7 +5602,7 @@ document.getElementById('srv-modal-edit').addEventListener('click', e=>{
 
 // ── TABS ─────────────────────────────────────────────────────────────
 function showTab(name){
-  if(isEiselfingUser() && name!=='masini' && name!=='soferi') name='masini';
+  if(isEiselfingUser() && !['masini','soferi','disponibil','log','amenda'].includes(name)) name='masini';
   ['masini','disponibil','log','amenda','soferi','setari','stricate','admin','backup-flota'].forEach(t=>{
     const el=document.getElementById('tab-'+t);
     if(el) el.style.display=t===name?'':'none';
@@ -5742,7 +5766,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261019-1422';
+const APP_VERSION='20261019-143956';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
