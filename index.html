@@ -1547,7 +1547,8 @@ let currentMode = null;
 const QUICK_USERS_FLOTA = [
   { username: 'cristi', name: 'Cristi' },
   { username: 'mihaela', name: 'Mihaela' },
-  { username: 'raluca', name: 'Raluca' }
+  { username: 'raluca', name: 'Raluca' },
+  { username: 'eiselfing', name: 'Eiselfing' }
 ];
 const QUICK_USERS_SERVICE = [
   { username: 'cristi-srv', name: 'Cristi', role: 'sef' },
@@ -1582,6 +1583,13 @@ function canEditStoc(){
   if(getSrvRole(currentUser.username)==='sef') return true;
   const n=(currentUser.name||'').trim().toLowerCase();
   return n==='cristi' || n==='mihai';
+}
+// Profil restricționat „Eiselfing": vede DOAR mașinile atribuite la Eiselfing, fără editare
+function isEiselfingUser(){
+  return !!currentUser && !isAdminUser && currentUser.username==='eiselfing';
+}
+function visibleMasini(){
+  return isEiselfingUser() ? masini.filter(m=>pcLocationOf(m)==='Eiselfing') : masini;
 }
 // Helper: e șef în Service?
 function isSrvSef(){
@@ -2323,6 +2331,20 @@ function updateAdminUI(){
     }
   });
 
+  // Profil Eiselfing: doar tab-ul Mașini, fără filtre de alte locații, fără listă verificare
+  const _eis=isEiselfingUser();
+  document.querySelectorAll('.tabs-bar .tab-btn').forEach(b=>{
+    const oc=b.getAttribute('onclick')||'';
+    if(_eis) b.style.display = (oc.includes("'masini'")||oc.includes("'soferi'")) ? '' : 'none';
+    else if(!b.id && b.textContent.trim()!=='Setări') b.style.display='';
+  });
+  document.querySelectorAll('#toolbar-masini .filter-btn').forEach(b=>{
+    const f=b.dataset.filter;
+    if(_eis && (!f || ['DEPOZIT','EISELFING_LOC','RUHSTORF_LOC','PAKETSHOP'].includes(f))) b.style.display='none';
+    else if(!_eis && b.style.display==='none') b.style.display='';
+  });
+  if(_eis){ try{ showTab('masini'); }catch(e){} }
+
   // Marchează body pentru CSS-ul restrictiv
   document.body.classList.toggle('user-mode', !isAdmin);
   document.body.classList.toggle('admin-mode', isAdmin);
@@ -2519,9 +2541,10 @@ function showUserMenu(){
 
 // ── STATS ────────────────────────────────────────────────────────────
 function updateStats(){
-  document.getElementById('stat-total').textContent=masini.length;
+  document.getElementById('stat-total').textContent=visibleMasini().length;
   document.getElementById('stat-disp').textContent=masini.filter(m=>sk(m.sofer)==='DEPOZIT').length;
   document.getElementById('stat-eisel').textContent=masini.filter(m=>getMasinaLocation(m)==='Eiselfing').length;
+  ['stat-disp','stat-eisel','stat-ruhst'].forEach(id=>{const e=document.getElementById(id); if(e&&e.parentElement) e.parentElement.style.display=isEiselfingUser()?'none':'';});
   document.getElementById('stat-ruhst').textContent=masini.filter(m=>getMasinaLocation(m)==='Ruhstorf').length;
 }
 
@@ -2534,7 +2557,7 @@ function setFilter(f){
 
 function renderCards(){
   const q=(document.getElementById('search')?.value||'').toLowerCase();
-  const filtered=masini.filter(m=>{
+  const filtered=visibleMasini().filter(m=>{
     if(currentFilter==='all'){
       // arătăm tot
     } else if(currentFilter==='DEPOZIT'){
@@ -3009,9 +3032,10 @@ function renderSoferi(){
   // Sortez și grupez pe locație
   const soferiList = soferi.map(s => typeof s === 'string' ? {name:s, location:''} : s);
   const eisel = soferiList.filter(s=>s.location==='Eiselfing').sort((a,b)=>a.name.localeCompare(b.name));
-  const ruhst = soferiList.filter(s=>s.location==='Ruhstorf').sort((a,b)=>a.name.localeCompare(b.name));
-  const paket = soferiList.filter(s=>s.location==='Paketshop').sort((a,b)=>a.name.localeCompare(b.name));
-  const other = soferiList.filter(s=>!s.location || (s.location!=='Eiselfing' && s.location!=='Ruhstorf' && s.location!=='Paketshop')).sort((a,b)=>a.name.localeCompare(b.name));
+  const _onlyE=isEiselfingUser();
+  const ruhst = _onlyE?[]:soferiList.filter(s=>s.location==='Ruhstorf').sort((a,b)=>a.name.localeCompare(b.name));
+  const paket = _onlyE?[]:soferiList.filter(s=>s.location==='Paketshop').sort((a,b)=>a.name.localeCompare(b.name));
+  const other = _onlyE?[]:soferiList.filter(s=>!s.location || (s.location!=='Eiselfing' && s.location!=='Ruhstorf' && s.location!=='Paketshop')).sort((a,b)=>a.name.localeCompare(b.name));
 
   function buildCard(s){
     const m=am[s.name];const c=avc(s.name);
@@ -5554,6 +5578,7 @@ document.getElementById('srv-modal-edit').addEventListener('click', e=>{
 
 // ── TABS ─────────────────────────────────────────────────────────────
 function showTab(name){
+  if(isEiselfingUser() && name!=='masini' && name!=='soferi') name='masini';
   ['masini','disponibil','log','amenda','soferi','setari','stricate','admin','backup-flota'].forEach(t=>{
     const el=document.getElementById('tab-'+t);
     if(el) el.style.display=t===name?'':'none';
@@ -5717,7 +5742,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261019-1413';
+const APP_VERSION='20261019-1422';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
