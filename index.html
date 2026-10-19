@@ -264,24 +264,23 @@ body.user-mode .log-mobile-card {
   body>*:not(#print-sheet){display:none !important;}
   html,body{background:#fff !important;}
   #print-sheet{display:block !important;color:#000;font-family:Arial,Helvetica,sans-serif;}
-  .pc-page{page-break-after:always;}
-  .pc-page:last-child{page-break-after:auto;}
-  .pc-h{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px;}
-  .pc-h h1{font-size:20pt;margin:0;}
-  .pc-h .pc-sub{font-size:10pt;color:#333;text-align:right;line-height:1.4;}
-  .pc-fields{display:flex;gap:24px;font-size:11pt;margin-bottom:8px;}
-  .pc-fields span{flex:1;border-bottom:1px solid #000;padding-bottom:2px;}
-  table.pc-t{width:100%;table-layout:fixed;border-collapse:collapse;font-size:11pt;}
+  .pc-block{margin-bottom:6mm;}
+  .pc-block.pc-break{page-break-before:always;}
+  .pc-h{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5px solid #000;padding-bottom:3px;margin-bottom:4px;}
+  .pc-h h1{font-size:14pt;margin:0;}
+  .pc-h .pc-sub{font-size:8.5pt;color:#333;text-align:right;line-height:1.3;}
+  .pc-fields{display:flex;gap:20px;font-size:9pt;margin-bottom:4px;height:5mm;}
+  .pc-fields span{flex:1;border-bottom:1px solid #000;}
+  table.pc-t{width:100%;table-layout:fixed;border-collapse:collapse;font-size:var(--fs,9pt);}
   table.pc-t td{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
   table.pc-t thead{display:table-header-group;}
   table.pc-t tr{page-break-inside:avoid;}
-  table.pc-t th,table.pc-t td{border:1px solid #000;padding:0 6px;height:10.5mm;vertical-align:middle;}
-  table.pc-t th{background:#e8e8e8;font-size:10pt;text-transform:uppercase;letter-spacing:.04em;height:8mm;}
-  .pc-nr{font-weight:700;font-size:12pt;white-space:nowrap;}
+  table.pc-t th,table.pc-t td{border:1px solid #000;padding:0 4px;height:var(--rh,7mm);line-height:1;vertical-align:middle;}
+  table.pc-t th{background:#e8e8e8;font-size:8pt;text-transform:uppercase;letter-spacing:.03em;height:6mm;}
+  .pc-nr{font-weight:700;white-space:nowrap;}
   .pc-c{text-align:center;}
-  .pc-box{display:inline-block;width:6mm;height:6mm;border:1.4px solid #000;vertical-align:middle;}
-  .pc-obs{}
-  .pc-foot{margin-top:6px;font-size:9pt;color:#333;display:flex;justify-content:space-between;}
+  .pc-box{display:inline-block;width:var(--bx,4.4mm);height:var(--bx,4.4mm);border:1.2px solid #000;vertical-align:middle;}
+  .pc-foot{margin-top:2mm;font-size:8pt;color:#333;text-align:right;}
 }
 
 /* ── ACTUALIZARE APLICAȚIE (obligatorie) ───────────── */
@@ -5718,7 +5717,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261019-1356';
+const APP_VERSION='20261019-1404';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
@@ -5897,22 +5896,52 @@ function doPrintCheck(){
   const now=new Date();
   const p2=n=>String(n).padStart(2,'0');
   const gen=`${p2(now.getDate())}.${p2(now.getMonth()+1)}.${now.getFullYear()} ${p2(now.getHours())}:${p2(now.getMinutes())}`;
-  const pages=locs.map(loc=>{
-    const cars=pcCars(loc,inc);
+  // Dimensionare automată: cât mai puține pagini (locațiile se grupează pe aceeași foaie dacă încap)
+  const PAGE_H=266, HEAD_H=15, THEAD_H=6, GAP=6, ROW_MAX=7, ROW_MIN=5;
+  const data=locs.map(loc=>({loc,cars:pcCars(loc,inc)}));
+  const rhFor=set=>{
+    const rows=set.reduce((a,b)=>a+Math.max(b.cars.length,1),0);
+    const fixed=set.length*(HEAD_H+THEAD_H)+(set.length-1)*GAP;
+    return Math.min(ROW_MAX,(PAGE_H-fixed)/rows);
+  };
+  const pack=order=>{
+    const pgs=[]; let cur=[];
+    order.forEach(b=>{
+      const t=[...cur,b];
+      if(cur.length && rhFor(t)<ROW_MIN){ pgs.push(cur); cur=[b]; } else cur=t;
+    });
+    if(cur.length) pgs.push(cur);
+    return pgs;
+  };
+  const perms=a=>a.length<=1?[a]:a.flatMap((x,i)=>perms([...a.slice(0,i),...a.slice(i+1)]).map(q=>[x,...q]));
+  let best=null;
+  perms(data).forEach(o=>{
+    const pgs=pack(o);
+    const minRh=Math.min(...pgs.map(rhFor));
+    if(!best || pgs.length<best.pgs.length || (pgs.length===best.pgs.length && minRh>best.minRh)) best={pgs,minRh};
+  });
+  const blockHtml=(b,rh,brk)=>{
+    const {loc,cars}=b;
+    const fs = rh>=6.5 ? 10 : rh>=5.8 ? 9 : 8;
+    const bx = Math.max(3.4, rh*0.62).toFixed(1);
     const rows=cars.map((m,i)=>{
       const sf=(m.sofer||'').toString().trim();
       const su=sf.toUpperCase();
       const sofer = su==='PAKETSHOP'||su==='EISELFING' ? `— ${loc} —` : (su==='STRICATA' ? 'STRICATĂ' : sf||'—');
-      return `<tr><td style="text-align:center">${i+1}</td><td class="pc-nr">${pcEsc(m.nr)}</td><td>${pcEsc(m.tip||'')}</td><td>${pcEsc(sofer)}</td><td class="pc-c"><span class="pc-box"></span></td><td class="pc-c"><span class="pc-box"></span></td><td class="pc-obs"></td></tr>`;
+      return `<tr><td style="text-align:center">${i+1}</td><td class="pc-nr">${pcEsc(m.nr)}</td><td>${pcEsc(m.tip||'')}</td><td>${pcEsc(sofer)}</td><td class="pc-c"><span class="pc-box"></span></td><td class="pc-c"><span class="pc-box"></span></td><td></td></tr>`;
     }).join('');
-    return `<div class="pc-page">
+    return `<div class="pc-block${brk?' pc-break':''}" style="--rh:${rh.toFixed(2)}mm;--fs:${fs}pt;--bx:${bx}mm">
       <div class="pc-h"><h1>Verificare curățenie — ${pcEsc(loc)}</h1>
-        <div class="pc-sub">Săptămâna ${pcWeek(now)} · ${now.getFullYear()}<br>${cars.length} mașini</div></div>
+        <div class="pc-sub">Săptămâna ${pcWeek(now)} · ${cars.length} mașini</div></div>
       <div class="pc-fields"><span>Data verificării:</span><span>Verificat de:</span></div>
-      <table class="pc-t"><colgroup><col style="width:9mm"><col style="width:31mm"><col style="width:26mm"><col style="width:45mm"><col style="width:20mm"><col style="width:20mm"><col></colgroup><thead><tr><th>#</th><th>Nr. auto</th><th>Tip</th><th>Șofer</th><th>Curat</th><th>Murdar</th><th>Obs.</th></tr></thead><tbody>${rows}</tbody></table>
-      <div class="pc-foot"><span>MTC Transport — Flotă</span><span>Listă generată: ${gen}</span></div>
+      <table class="pc-t"><colgroup><col style="width:8mm"><col style="width:30mm"><col style="width:22mm"><col style="width:48mm"><col style="width:18mm"><col style="width:18mm"><col></colgroup><thead><tr><th>#</th><th>Nr. auto</th><th>Tip</th><th>Șofer</th><th>Curat</th><th>Murdar</th><th>Obs.</th></tr></thead><tbody>${rows}</tbody></table>
     </div>`;
-  }).join('');
+  };
+  const blocks=best.pgs.map((set,pi)=>{
+    const rh=Math.max(ROW_MIN,rhFor(set));
+    return set.map((b,bi)=>blockHtml(b,rh,pi>0&&bi===0)).join('');
+  });
+  const pages=blocks.join('')+`<div class="pc-foot">MTC Transport — Flotă · Listă generată: ${gen}</div>`;
   let sheet=document.getElementById('print-sheet');
   if(!sheet){ sheet=document.createElement('div'); sheet.id='print-sheet'; document.body.appendChild(sheet); }
   sheet.innerHTML=pages;
