@@ -4022,23 +4022,48 @@ const _pkTipGetter = {
   done: ()=>{ const t=taskuri.find(x=>x.id===completingTaskId); return t?t.masinaTip:''; },
   edit: ()=>{ const r=reparatii.find(x=>x.id===editingRepId); return r?r.masinaTip:''; }
 };
+// Piesa se potrivește mașinii? Universal / ALTELE / fără tip / categoria „Altele" = pentru orice mașină;
+// altfel tipul piesei (CRAFTER/T6/ELEKTRO) trebuie să fie același cu al mașinii.
+function pkCompatible(st, tip){
+  if(!st) return false;
+  const c=(st.compatibil||'').trim();
+  if(!c || c.toLowerCase()==='universal' || c.toUpperCase()==='ALTELE') return true;
+  if((st.categorie||'').toLowerCase()==='altele') return true;
+  const mt=tip||'';
+  if(!mt) return false;
+  const known=['CRAFTER','T6','ELEKTRO'];
+  const carKey = known.includes(mt)?mt:'ALTELE';
+  return c.toUpperCase()===carKey;
+}
+// Verifică piesele alese pentru mașina curentă; întoarce numele pieselor nepotrivite
+function pkMismatches(key){
+  const tip=_pkTipGetter[key]();
+  return _pk[key].filter(x=>!pkCompatible(stoc.find(s=>s.id===x.stocId), tip)).map(x=>x.nume);
+}
+function pkGuard(key){
+  const bad=pkMismatches(key);
+  if(bad.length){ toast('⚠ Piese pentru alt model de mașină: '+bad.join(', ')+' — elimină-le sau alege piesa potrivită'); return false; }
+  return true;
+}
 function pkEsc(x){ return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
 function pkRender(key){
   const box=document.getElementById('pk-'+key); if(!box) return;
   const tip=_pkTipGetter[key]();
   const usedIds=new Set(_pk[key].map(x=>x.stocId));
   const opts=stoc.filter(s=>!usedIds.has(s.id))
-    .filter(s=>!tip || !s.compatibil || s.compatibil==='Universal' || s.compatibil===tip)
+    .filter(s=>pkCompatible(s,tip))
     .sort((a,b)=>(a.categorie||'').localeCompare(b.categorie||'')||(a.nume||'').localeCompare(b.nume||''))
     .map(s=>`<option value="${s.id}">${pkEsc(s.nume)}${s.compatibil?' ['+pkEsc(s.compatibil)+']':''} — ${s.cantitate} buc</option>`).join('');
   const chips=_pk[key].map((x,i)=>{
     const st=stoc.find(s=>s.id===x.stocId);
     const low = st && st.cantitate < x.qty;
+    const bad = !pkCompatible(st, tip);
     return `<div style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:7px 10px;margin-bottom:6px;font-size:13px">
-      <span style="flex:1;min-width:0">${pkEsc(x.nume)} <b style="font-family:var(--mono)">× ${x.qty}</b>${low?' <span style="color:var(--danger);font-size:11px">⚠ în stoc: '+st.cantitate+'</span>':''}</span>
+      <span style="flex:1;min-width:0">${pkEsc(x.nume)} <b style="font-family:var(--mono)">× ${x.qty}</b>${bad?' <span style="color:var(--danger);font-size:11px;font-weight:600">⚠ nu se potrivește ('+pkEsc(st&&st.compatibil||'?')+')</span>':''}${low?' <span style="color:var(--danger);font-size:11px">⚠ în stoc: '+st.cantitate+'</span>':''}</span>
       <button type="button" onclick="pkRemove('${key}',${i})" style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;line-height:1">×</button></div>`;
   }).join('');
-  box.innerHTML = chips + (stoc.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap">
+  const noCar = !tip;
+  box.innerHTML = chips + (noCar && key!=='done' && key!=='edit' ? '<div style="font-size:12px;color:var(--text3)">Alege mai întâi mașina, ca să vezi piesele potrivite.</div>' : stoc.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap">
       <select id="pk-sel-${key}" style="flex:1;min-width:160px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-size:14px;padding:9px 10px"><option value="">— alege piesa din stoc —</option>${opts}</select>
       <input id="pk-qty-${key}" type="number" min="1" value="1" style="width:64px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:14px;padding:9px 8px">
       <button type="button" class="btn" onclick="pkAdd('${key}')" style="flex:none;width:auto">+ Adaugă</button></div>`
@@ -4049,6 +4074,7 @@ function pkAdd(key){
   const qty=Math.max(1,parseInt(document.getElementById('pk-qty-'+key)?.value)||1);
   if(!id){ toast('Alege piesa'); return; }
   const st=stoc.find(s=>s.id===id); if(!st) return;
+  if(!pkCompatible(st,_pkTipGetter[key]())){ toast('⚠ Piesa „'+st.nume+'" este pentru '+(st.compatibil||'alt model')+', nu pentru această mașină'); return; }
   _pk[key].push({stocId:id, nume:st.nume, qty});
   pkRender(key);
 }
@@ -4069,8 +4095,15 @@ function pkDeduct(list){
   return short;
 }
 document.addEventListener('change',e=>{
-  if(e.target.id==='srv-new-masina') pkRender('add');
-  if(e.target.id==='srv-task-masina') pkRender('task');
+  const key = e.target.id==='srv-new-masina' ? 'add' : e.target.id==='srv-task-masina' ? 'task' : null;
+  if(!key) return;
+  const bad=pkMismatches(key);
+  if(bad.length){
+    const tip=_pkTipGetter[key]();
+    _pk[key]=_pk[key].filter(x=>pkCompatible(stoc.find(s=>s.id===x.stocId), tip));
+    toast('⚠ Am scos piesele care nu se potrivesc noii mașini: '+bad.join(', '));
+  }
+  pkRender(key);
 });
 window.pkAdd=pkAdd; window.pkRemove=pkRemove;
 
@@ -5385,6 +5418,7 @@ function srvSaveTask(){
   if(!masinaId){ toast('Alege mașina'); return; }
   if(!asignat){ toast('Alege cui îi atribui sarcina'); return; }
   if(!descriere){ toast('Adaugă descrierea'); return; }
+  if(!pkGuard('task')) return;
 
   const m = masini.find(x=>x.id===masinaId);
   if(!m){ toast('Mașină inexistentă'); return; }
@@ -5493,6 +5527,7 @@ function srvFinalizeTask(){
 
   // Nimeni nu poate finaliza fără kilometraj
   if(srvRequireKm(km, t.masinaId, t.masinaNr, 'srv-complete-km') === null) return;
+  if(!pkGuard('done')) return;
 
   t.status = 'done';
   t.completedBy = currentUser?.name || 'unknown';
@@ -5669,6 +5704,7 @@ function srvAddReparatie(){
     if(srvRequireKm(km, masinaId, _m ? _m.nr : '', 'srv-new-km') === null) return;
   }
   if(!descriere){ toast('Adaugă descrierea'); return; }
+  if(!pkGuard('add')) return;
 
   const m = masini.find(x=>x.id===masinaId);
   if(!m){ toast('Mașină inexistentă'); return; }
@@ -5772,6 +5808,7 @@ function srvSaveEdit(){
   if(document.getElementById('srv-edit-status').value==='done' && (r.status!=='done' || r.km)){
     if(srvRequireKm(document.getElementById('srv-edit-km').value, r.masinaId, r.masinaNr, 'srv-edit-km') === null) return;
   }
+  if(!pkGuard('edit')) return;
   r.status = document.getElementById('srv-edit-status').value;
   r.data = document.getElementById('srv-edit-data').value;
   const kmVal = document.getElementById('srv-edit-km').value;
@@ -6006,7 +6043,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261021-083006';
+const APP_VERSION='20261021-084138';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
