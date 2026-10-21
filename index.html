@@ -4413,7 +4413,9 @@ function srvmCatsFor(descriere){
   const spate=/\bspate\b|\brear\b/.test(d);
   const pos=(f,sp,alt)=>{ if(fata)out.push(f); if(spate)out.push(sp); if(!fata&&!spate)out.push(alt); };
   if(/\bulei|\boil\b/.test(d)) out.push('ulei');
-  if(/cauc|anvelop|\broat|\broti\b|\btyre|\btire/.test(d)) pos('cauciucuri_fata','cauciucuri_spate','cauciucuri_alte');
+  // „roată" lângă rulment/butuc/pivot/frână etc. = locația piesei, nu cauciuc
+  const dW=d.replace(/(rulment\w*|butuc\w*|bucs\w*|pivot\w*|planetar\w*|amortizor\w*|flansa|brat\w*|bieleta|bielete|etrier\w*|disc\w*|placut\w*|fran\w*|frin\w*)\s+(de\s+|la\s+)?roat\w*|roat\w*\s+(dreapta\s+|stanga\s+|fata\s+|spate\s+)*(rulment\w*|butuc\w*)/g,' ');
+  if(/cauc|anvelop|\btyre|\btire/.test(d) || /\broat|\broti\b/.test(dW)) pos('cauciucuri_fata','cauciucuri_spate','cauciucuri_alte');
   if(/placut|\bfr[ai]n|brake|\bdiscur|\bdisc\b|etrier/.test(d)) pos('frane_fata','frane_spate','frane_alte');
   if(/\bfiltr|polen/.test(d)) out.push('filtre');
   if(/distributi|\bcurea|intinzator|\brola\b|\brole\b|fulie/.test(d)) out.push('distributie');
@@ -4450,6 +4452,59 @@ function srvmAnalyze(r){
 function srvmSetFilter(k){srvmFilter=k;renderSrvmContent(currentSrvMasinaId);}
 function srvmSetQuery(v){srvmQuery=(v||'').trim();renderSrvmContent(currentSrvMasinaId);}
 
+// ── Texte foarte lungi (ex. import Inkpad): arătăm doar fragmentul din jurul cuvântului-cheie ──
+const SRVM_KW={
+  ulei:/\bulei|\boil\b/, cauciucuri_fata:/cauc|anvelop|\broat|\broti\b/, cauciucuri_spate:/cauc|anvelop|\broat|\broti\b/, cauciucuri_alte:/cauc|anvelop|\broat|\broti\b/,
+  frane_fata:/placut|\bfr[ai]n|\bdisc|etrier/, frane_spate:/placut|\bfr[ai]n|\bdisc|etrier/, frane_alte:/placut|\bfr[ai]n|\bdisc|etrier/,
+  filtre:/\bfiltr|polen/, distributie:/distributi|\bcurea|intinzator|\brola\b|fulie/,
+  transmisie:/planetar|\bcutie|ambrei?aj|\bviteze|diferential|flansa|cardan|palier/,
+  suspensie:/bieleta|amortizor|rulment|\bbrat|pivot|stabilizator|bucs|telescoap|directie/,
+  motor:/\bmotor\b|turbo|injector|alternator|radiator|galerie|admisie|\begr\b|\bpompa|\bsenzor|bujii/,
+  caroserie:/oglind|parbriz|\busa\b|\bgeam|spoiler|\bscaun/
+};
+const SRVM_CLIP_LEN=110;
+let _srvmClipId=0;
+// Taie un text lung în „bucăți" pe categorii: cuvântul-cheie + modificatorii lui (dreapta/stânga/față/spate)
+function srvmChunks(text){
+  const strip=w=>w.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const fam=w=>new Set(srvmCatsFor(w).map(k=>k.replace(/_(fata|spate|alte)$/,'')));
+  const MOD=/^(dreapta|dreapt|stanga|stg|dr|fata|spate|fata)$/;
+  const toks=String(text||'').split(/\s+/).filter(Boolean);
+  const chunks=[];
+  for(let i=0;i<toks.length;){
+    const f=fam(toks[i]);
+    if(!f.size){ i++; continue; }
+    const first=[...f][0];
+    let j=i+1;
+    while(j<toks.length){
+      const w=strip(toks[j]);
+      if(MOD.test(w)){ j++; continue; }
+      if(first!=='cauciucuri' && /^(roata|roti|roate)$/.test(w)){ j++; continue; }  // „rulment roată dreapta spate"
+      if(fam(toks[j]).has(first)){ j++; continue; }
+      if(j+1<toks.length && fam(toks[j+1]).has(first) && !fam(toks[j]).size && !MOD.test(strip(toks[j+1]))){ j+=2; continue; }
+      break;
+    }
+    chunks.push(toks.slice(i,j).join(' '));
+    i=j;
+  }
+  return chunks;
+}
+function srvmClipHtml(text, catKey){
+  const t=String(text||'');
+  if(t.length<=SRVM_CLIP_LEN) return srvmEsc(t);
+  let excerpt='';
+  const mine = catKey ? srvmChunks(t).filter(c=>srvmCatsFor(c).includes(catKey)) : [];
+  if(mine.length){
+    excerpt=[...new Set(mine)].join(' · ');
+  } else {
+    let b=SRVM_CLIP_LEN; const sp=t.lastIndexOf(' ',b); if(sp>40) b=sp;
+    excerpt=t.slice(0,b).trim()+' …';
+  }
+  const id='srvmc'+(++_srvmClipId);
+  return `<span id="${id}s">${srvmEsc(excerpt)}</span><span id="${id}f" style="display:none">${srvmEsc(t)}</span> `+
+    `<a href="#" onclick="var s=document.getElementById('${id}s'),f=document.getElementById('${id}f');var o=f.style.display==='none';f.style.display=o?'':'none';s.style.display=o?'none':'';this.textContent=o?'« mai puțin':'tot textul';return false;" style="font-size:11px;color:var(--text3);white-space:nowrap" title="Arată textul complet din import">tot textul</a>`;
+}
+
 function renderSrvmContent(masinaId){
   const sec=document.getElementById('srvm-content');if(!sec)return;
   const m=masini.find(x=>x.id===masinaId);
@@ -4469,7 +4524,7 @@ function renderSrvmContent(masinaId){
   const byCat={}; SRVM_CATS.forEach(c=>byCat[c.key]=[]);
   reps.forEach(r=>{
     const a=srvmAnalyze(r); r._cats=a.cats;
-    a.cats.forEach(k=>byCat[k].push({r, text:a.items[k].join(' · ')}));
+    a.cats.forEach(k=>byCat[k].push({r, key:k, text:a.items[k].join(' · ')}));
   });
 
   // chips
@@ -4496,7 +4551,7 @@ function renderSrvmContent(masinaId){
     return `<div class="srvm-row">
       <div class="srvm-date">${srvmFmtDate(r.data)}</div>
       <div class="srvm-km">${r.km?Number(r.km).toLocaleString()+' km':'—'}${diff}</div>
-      <div class="srvm-desc">${srvmEsc(it.text)||'—'}${withTags?tagsFor(r):''}${(r.obs&&(withTags||r._cats.length===1))?`<div class="srvm-obs">${srvmEsc(r.obs)}</div>`:''}</div>
+      <div class="srvm-desc">${srvmClipHtml(it.text, it.key)||'—'}${withTags?tagsFor(r):''}${(r.obs&&(withTags||r._cats.length===1))?`<div class="srvm-obs">${srvmEsc(r.obs)}</div>`:''}</div>
       ${showCost(r)}
     </div>`;
   }
@@ -6043,7 +6098,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261021-094815';
+const APP_VERSION='20261021-104204';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
