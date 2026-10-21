@@ -50,7 +50,7 @@ button{font-family:inherit;}
 .quick-user-avatar[data-name="Mihaela"]{background:rgba(255,122,198,.15);color:#ff7ac6;}
 .quick-user-avatar[data-name="Raluca"]{background:rgba(74,255,160,.15);color:#4affa0;}
 .quick-user-avatar[data-name="Mihai"]{background:rgba(167,139,250,.15);color:#a78bfa;}
-.quick-user-avatar[data-name="Ion"]{background:rgba(251,191,36,.15);color:#fbbf24;}
+.quick-user-avatar[data-name="Ioan"]{background:rgba(251,191,36,.15);color:#fbbf24;}
 .quick-user-avatar[data-name="Vasile"]{background:rgba(74,255,160,.15);color:#4affa0;}
 .admin-toggle-btn{margin-top:8px;padding:11px;background:transparent;border:1px solid var(--border);border-radius:var(--radius);color:var(--text2);font-size:13px;cursor:pointer;font-family:inherit;}
 .admin-toggle-btn:active,.admin-toggle-btn:hover{color:var(--text);border-color:var(--border2);}
@@ -209,7 +209,7 @@ button{font-family:inherit;}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:12px 18px;font-size:13px;z-index:400;box-shadow:0 4px 12px rgba(0,0,0,.4);max-width:90vw;opacity:0;transition:opacity .2s;pointer-events:none;}
 .toast.show{opacity:1;}
 
-/* ── ROL MECANIC (Ion/Vasile) — ascund costuri ── */
+/* ── ROL MECANIC (Ioan/Vasile) — ascund costuri ── */
 body.srv-mecanic .srv-cost-field,
 body.srv-mecanic .srv-cost-display {
   display: none !important;
@@ -904,7 +904,7 @@ body.user-mode .log-mobile-card {
     <div id="srv-taskuri-toolbar" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
       <button class="filter-btn active" data-task-filter="me" onclick="setTaskFilter('me')">Sarcinile mele</button>
       <button class="filter-btn" data-task-filter="all" onclick="setTaskFilter('all')">Toate</button>
-      <button class="filter-btn" data-task-filter="ion-srv" onclick="setTaskFilter('ion-srv')">Ion</button>
+      <button class="filter-btn" data-task-filter="ion-srv" onclick="setTaskFilter('ion-srv')">Ioan</button>
       <button class="filter-btn" data-task-filter="vasile-srv" onclick="setTaskFilter('vasile-srv')">Vasile</button>
       <button class="filter-btn" data-task-filter="done" onclick="setTaskFilter('done')">Finalizate</button>
       <div style="flex:1"></div>
@@ -962,7 +962,7 @@ body.user-mode .log-mobile-card {
         <textarea id="srv-new-obs" rows="3" placeholder="detalii suplimentare..." style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:14px;padding:10px 12px;outline:none;resize:vertical"></textarea>
       </div>
 
-      <!-- Bifă piese nepotrivite — vizibilă doar pentru mecanici (Ion/Vasile) -->
+      <!-- Bifă piese nepotrivite — vizibilă doar pentru mecanici (Ioan/Vasile) -->
       <div id="srv-piesa-nepotrivita-wrap" style="display:none;margin-bottom:18px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:var(--radius);padding:12px 14px">
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
           <input type="checkbox" id="srv-new-piesa-nep" style="width:18px;height:18px;cursor:pointer;accent-color:var(--danger)">
@@ -1093,7 +1093,7 @@ body.user-mode .log-mobile-card {
       </div>
       <div id="push-test-result" style="display:none;background:var(--surface2);border-radius:6px;padding:10px 14px;font-size:12px;font-family:var(--mono);color:var(--text2);margin-bottom:12px;line-height:1.7"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-primary" onclick="testPushFirebase('sarcina')" style="flex:none;width:auto">🔧 Test push → Ion/Vasile</button>
+        <button class="btn btn-primary" onclick="testPushFirebase('sarcina')" style="flex:none;width:auto">🔧 Test push → Ioan/Vasile</button>
         <button class="btn btn-primary" onclick="testPushFirebase('finalizare')" style="flex:none;width:auto">✅ Test push → Cristi/Mihai</button>
         <button class="btn btn-primary" onclick="testPushFirebase('garantie')" style="flex:none;width:auto">🛡 Test push → toți șefii</button>
       </div>
@@ -1134,7 +1134,7 @@ body.user-mode .log-mobile-card {
     <div class="modal-field">
       <div class="modal-label">Cine se ocupă</div>
       <select id="srv-task-asignat">
-        <option value="ion-srv">Ion</option>
+        <option value="ion-srv">Ioan</option>
         <option value="vasile-srv">Vasile</option>
       </select>
     </div>
@@ -1160,7 +1160,7 @@ body.user-mode .log-mobile-card {
   </div>
 </div>
 
-<!-- Modal completare task (de către Ion/Vasile) -->
+<!-- Modal completare task (de către Ioan/Vasile) -->
 <div class="modal-overlay" id="srv-modal-complete">
   <div class="modal">
     <div class="modal-title">Marchează sarcină finalizată</div>
@@ -1597,7 +1597,7 @@ const QUICK_USERS_FLOTA = [
 const QUICK_USERS_SERVICE = [
   { username: 'cristi-srv', name: 'Cristi', role: 'sef' },
   { username: 'mihai-srv', name: 'Mihai', role: 'sef' },
-  { username: 'ion-srv', name: 'Ion', role: 'mecanic' },
+  { username: 'ion-srv', name: 'Ioan', role: 'mecanic' },
   { username: 'vasile-srv', name: 'Vasile', role: 'mecanic' }
 ];
 
@@ -1607,7 +1607,7 @@ function getSrvRole(username){
   const u = QUICK_USERS_SERVICE.find(x=>x.username===username);
   return u ? u.role : null;
 }
-// Helper: e mecanic (Ion/Vasile) — logică inversată, mai sigură
+// Helper: e mecanic (Ioan/Vasile) — logică inversată, mai sigură
 function isSrvMecanic(){
   if(!currentUser) return false;
   if(isAdminUser) return false;
@@ -1621,7 +1621,7 @@ function isSrvMecanic(){
   return false;
 }
 function checkIsMecanic(){ return isSrvMecanic(); }
-// Helper: cine poate adăuga/edita stoc piese (admin + Cristi + Mihai + Ion + Vasile)
+// Helper: cine poate adăuga/edita stoc piese (admin + Cristi + Mihai + Ioan + Vasile)
 function canEditStoc(){
   if(isAdminUser) return true;
   if(!currentUser) return false;
@@ -2091,7 +2091,7 @@ window.addEventListener('firebase-ready', ()=>{
         uid:user.uid,
         email:user.email,
         username:username,
-        name:user.displayName||username
+        name:((QUICK_USERS_FLOTA.concat(QUICK_USERS_SERVICE)).find(q=>q.username===username)||{}).name||user.displayName||username
       };
 
       // Determine modul-ul: dacă username se termină în -srv, e Service
@@ -2315,6 +2315,13 @@ function hydrateFromCloud(d){
   garantii = (d.garantii||[]).map(g=>({...g}));
   garantiiIdCtr = d.garantiiIdCtr || 1;
   _setBaseline(_serialLocal());
+  // Redenumire „Ion" -> „Ioan" în datele vechi (nume afișate)
+  (function(){
+    let ch=false; const F=['addedBy','completedBy','createdBy','editedBy','preluatBy','restituitBy','name'];
+    const fix=o=>{ F.forEach(k=>{ if(o && o[k]==='Ion'){ o[k]='Ioan'; ch=true; } }); };
+    [taskuri,reparatii,log,knownUsers].forEach(arr=>arr.forEach(fix));
+    if(ch) setTimeout(()=>saveToCloud(),1200);
+  })();
 
   // Verifică forced logout pentru user-ul curent
   if(currentUser && window._currentForcedLogouts[currentUser.username]){
@@ -3711,7 +3718,7 @@ function showInAppNotification(title, body){
   setTimeout(()=>el.remove(), 5000);
 }
 
-// Rezumat de dimineață pentru Ion/Vasile — apare la prima deschidere a zilei
+// Rezumat de dimineață pentru Ioan/Vasile — apare la prima deschidere a zilei
 function getGreeting(){
   const h = new Date().getHours();
   if(h < 12) return 'Bună dimineața';
@@ -4765,7 +4772,7 @@ async function testNotifLocal(tip='general'){
       body: 'De la Cristi: schimb plăcuțe frână față · Termen: 10.05.2026'
     },
     finalizare: {
-      title: '✅ Ion a finalizat o sarcină',
+      title: '✅ Ioan a finalizat o sarcină',
       body: 'MU IE 815 · schimb filtru aer'
     },
     garantie: {
@@ -4803,13 +4810,13 @@ async function testPushFirebase(tip='sarcina'){
     const targetUsers = ku.filter(u=>targets.includes(u.username) && u.pushToken);
 
     if(!targetUsers.length){
-      if(resultBox) resultBox.innerHTML = `✗ Niciun destinatar cu token valid pentru "${tip}".\nAsigură-te că Ion/Vasile/Cristi/Mihai au apăsat "Reîmprospătează token".`;
+      if(resultBox) resultBox.innerHTML = `✗ Niciun destinatar cu token valid pentru "${tip}".\nAsigură-te că Ioan/Vasile/Cristi/Mihai au apăsat "Reîmprospătează token".`;
       return;
     }
 
     const templates = {
       sarcina: { title:'🔧 Sarcină nouă — MU IE 803 [TEST]', body:'De la Cristi: schimb plăcuțe frână față · Termen: mâine' },
-      finalizare: { title:'✅ Ion a finalizat o sarcină [TEST]', body:'MU IE 803 · schimb plăcuțe frână față' },
+      finalizare: { title:'✅ Ioan a finalizat o sarcină [TEST]', body:'MU IE 803 · schimb plăcuțe frână față' },
       garantie: { title:'⚠️ Garanție expiră mâine [TEST]', body:'MU IE 820 · Mercedes-Benz Dealer' }
     };
     const tmpl = templates[tip];
@@ -4825,7 +4832,7 @@ async function testPushFirebase(tip='sarcina'){
       `✓ Găsiți ${targetUsers.length} destinatar(i):\n${lines.join('\n')}\n\n` +
       `📤 Titlu: ${tmpl.title}\n📄 Body: ${tmpl.body}\n\n` +
       `ℹ️ Notificarea se trimite prin Firebase Functions la adăugarea unei sarcini reale.\n` +
-      `Dacă vrei să testezi push-ul complet, adaugă o sarcină de test pentru Ion/Vasile.`;
+      `Dacă vrei să testezi push-ul complet, adaugă o sarcină de test pentru Ioan/Vasile.`;
 
     toast(`Test push: ${targetUsers.length} destinatar(i) cu token valid`);
   }catch(e){
@@ -5306,7 +5313,7 @@ function renderSrvTaskuri(){
   const addBtn = document.getElementById('srv-add-task-btn');
   if(addBtn) addBtn.style.display = sef ? '' : 'none';
 
-  // Ascund filtrele Ion/Vasile pentru mecanici (ei văd doar sarcinile lor)
+  // Ascund filtrele Ioan/Vasile pentru mecanici (ei văd doar sarcinile lor)
   const filterToolbar = document.getElementById('srv-taskuri-toolbar');
   if(filterToolbar){
     filterToolbar.querySelectorAll('[data-task-filter="ion-srv"], [data-task-filter="vasile-srv"], [data-task-filter="all"]').forEach(b=>{
@@ -5643,7 +5650,7 @@ function srvDeleteTask(){
   toast('Sarcină ștearsă');
 }
 
-// Kilometraj obligatoriu pentru mecanici (Ion/Vasile) la finalizare.
+// Kilometraj obligatoriu pentru mecanici (Ioan/Vasile) la finalizare.
 // Returnează numărul de km valid sau null dacă e blocat (mesajul e afișat deja).
 function srvRequireKm(kmStr, masinaId, masinaNr, inputId){
   const km = Number(kmStr);
@@ -6216,7 +6223,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261021-121128';
+const APP_VERSION='20261021-122748';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
