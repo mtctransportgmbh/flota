@@ -3248,7 +3248,7 @@ function renderSetari(){
             <option value="Paketshop" ${s.location==='Paketshop'?'selected':''}>Paketshop</option>
           </select>
         </div>
-        <button onclick="removeSofer(${JSON.stringify(s.name)})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;padding:0 4px;line-height:1;flex-shrink:0">×</button>
+        <button onclick="removeSofer(${JSON.stringify(s.name).replace(/"/g,'&quot;')})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;padding:0 4px;line-height:1;flex-shrink:0">×</button>
       </div>`;
     }).join('')+'</div>';
 }
@@ -6043,7 +6043,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261021-084138';
+const APP_VERSION='20261021-094815';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
