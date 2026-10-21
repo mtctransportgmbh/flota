@@ -70,6 +70,8 @@ button{font-family:inherit;}
 .header-right{display:flex;align-items:center;gap:14px;}
 .header-stats{display:flex;gap:18px;}
 .hstat{text-align:right;}
+.hstat-tap{cursor:pointer;-webkit-tap-highlight-color:rgba(0,0,0,.08);}
+.hstat-tap:active{opacity:.6;}
 .hstat-val{font-family:var(--mono);font-size:17px;font-weight:500;color:var(--accent);line-height:1;}
 .hstat-label{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;}
 .user-chip{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface);border:1px solid var(--border2);border-radius:20px;cursor:pointer;font-size:12px;}
@@ -863,9 +865,9 @@ body.user-mode .log-mobile-card {
   </div>
   <div class="header-right">
     <div class="header-stats">
-      <div class="hstat"><div class="hstat-val" id="srv-stat-tasks" style="color:var(--t6)">0</div><div class="hstat-label">Sarcini</div></div>
-      <div class="hstat"><div class="hstat-val" id="srv-stat-active" style="color:var(--t6)">0</div><div class="hstat-label">Active</div></div>
-      <div class="hstat"><div class="hstat-val" id="srv-stat-done" style="color:var(--accent)">0</div><div class="hstat-label">Finalizate</div></div>
+      <div class="hstat hstat-tap" onclick="srvOpenStat('tasks')" role="button"><div class="hstat-val" id="srv-stat-tasks" style="color:var(--t6)">0</div><div class="hstat-label">Sarcini</div></div>
+      <div class="hstat hstat-tap" onclick="srvOpenStat('active')" role="button"><div class="hstat-val" id="srv-stat-active" style="color:var(--t6)">0</div><div class="hstat-label">Active</div></div>
+      <div class="hstat hstat-tap" onclick="srvOpenStat('done')" role="button"><div class="hstat-val" id="srv-stat-done" style="color:var(--accent)">0</div><div class="hstat-label">Finalizate</div></div>
       <div class="hstat srv-cost-display"><div class="hstat-val" id="srv-stat-cost" style="color:var(--text)">0</div><div class="hstat-label">Cost €</div></div>
     </div>
     <div class="user-chip" onclick="showSrvUserMenu()">
@@ -1255,6 +1257,18 @@ body.user-mode .log-mobile-card {
 </div>
 
 <!-- Modal istoric mașină -->
+<!-- Modal rezumat (apăsat pe Sarcini / Active / Finalizate) -->
+<div class="modal-overlay" id="srv-modal-stat" onclick="if(event.target===this)srvCloseStat()">
+  <div class="modal" style="max-width:560px;max-height:88vh;overflow-y:auto">
+    <div class="modal-title" id="srv-stat-title">Rezumat</div>
+    <div id="srv-stat-body"></div>
+    <div class="modal-actions">
+      <button class="btn" id="srv-stat-goto" style="display:none"></button>
+      <button class="btn btn-primary" onclick="srvCloseStat()">Închide</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="srv-modal-istoric-masina" onclick="if(event.target===this)srvmClose()">
   <div class="modal srvm-modal">
     <div class="srvm-head">
@@ -5459,6 +5473,110 @@ function updateSrvTaskMasinaInfo(){
   info.innerHTML = `Șofer curent: <strong style="color:var(--text)">${driver.sofer}</strong>`;
 }
 
+
+// ── REZUMAT PE MECANIC (apăsat pe Sarcini / Active / Finalizate) ─────
+function srvCloseStat(){ document.getElementById('srv-modal-stat').classList.remove('open'); }
+function srvOpenStat(kind){
+  const esc=x=>String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const mecs=QUICK_USERS_SERVICE.filter(u=>u.role==='mecanic');
+  const nameOf=u=>(QUICK_USERS_SERVICE.find(x=>x.username===u)||{}).name||u||'—';
+  let title='', groups=[], goto=null;
+  if(kind==='tasks'){
+    title='Sarcini în așteptare — pe mecanic';
+    const list=taskuri.filter(t=>t.status!=='done');
+    const keys=[...new Set([...mecs.map(m=>m.username),...list.map(t=>t.asignat)])];
+    groups=keys.map(k=>({name:nameOf(k), items:list.filter(t=>t.asignat===k).sort((a,b)=>(a.deadline||'9999').localeCompare(b.deadline||'9999')).map(t=>({
+      main:`${esc(t.masinaNr)} · ${esc(t.descriere)}`, sub:(t.deadline?'Termen: '+t.deadline.split('-').reverse().join('.'):'')+(t.createdBy?(t.deadline?' · ':'')+'de la '+esc(t.createdBy):''), piese:t.piese}))}));
+    goto={label:'Deschide Sarcini', fn:()=>showSrvTab('taskuri')};
+  } else if(kind==='active'){
+    title='Reparații în lucru — pe mecanic';
+    const list=reparatii.filter(r=>r.status==='active');
+    const keyOf=r=>r.addedByUsername||r.addedBy||'';
+    const keys=[...new Set([...mecs.map(m=>m.username),...list.map(keyOf)])];
+    groups=keys.map(k=>({name:nameOf(k)||k, items:list.filter(r=>keyOf(r)===k).map(r=>({
+      main:`${esc(r.masinaNr)} · ${esc(r.descriere)}`, sub:(r.data?r.data.split('-').reverse().join('.'):'')+(r.km?' · '+Number(r.km).toLocaleString()+' km':''), piese:r.piese}))}));
+    goto={label:'Deschide Active', fn:()=>showSrvTab('active')};
+  } else {
+    title='Finalizate — pe mecanic (ultimele 40)';
+    const list=reparatii.filter(r=>r.status==='done').sort((a,b)=>(b.data||'').localeCompare(a.data||'')||(b.id||0)-(a.id||0)).slice(0,40);
+    const keyOf=r=>r.addedByUsername||r.addedBy||'';
+    const keys=[...new Set([...mecs.map(m=>m.username),...list.map(keyOf)])];
+    groups=keys.map(k=>({name:nameOf(k)||k, items:list.filter(r=>keyOf(r)===k).map(r=>({
+      main:`${esc(r.masinaNr)} · ${esc(r.descriere)}`, sub:(r.data?r.data.split('-').reverse().join('.'):'')+(r.km?' · '+Number(r.km).toLocaleString()+' km':''), piese:r.piese}))}));
+    goto={label:'Deschide Istoric', fn:()=>showSrvTab('istoric')};
+  }
+  groups=groups.filter(g=>g.name);
+  document.getElementById('srv-stat-title').textContent=title;
+  document.getElementById('srv-stat-body').innerHTML = groups.map(g=>`
+    <div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px;font-weight:600"><span>${esc(g.name)}</span><span style="font-family:var(--mono)">${g.items.length}</span></div>
+      ${g.items.length? g.items.map(it=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;margin-bottom:6px;font-size:13px;line-height:1.4">
+          <div>${it.main}</div>
+          ${it.sub?`<div style="font-size:11px;color:var(--text3);margin-top:2px">${it.sub}</div>`:''}
+          ${typeof pkSummary==='function'?pkSummary(it.piese):''}
+        </div>`).join('') : '<div style="font-size:12px;color:var(--text3);padding:2px 2px 6px">Nimic</div>'}
+    </div>`).join('') || '<div style="font-size:13px;color:var(--text3)">Nimic de afișat.</div>';
+  const gb=document.getElementById('srv-stat-goto');
+  gb.style.display=''; gb.textContent=goto.label;
+  gb.onclick=()=>{ srvCloseStat(); goto.fn(); };
+  document.getElementById('srv-modal-stat').classList.add('open');
+}
+window.srvOpenStat=srvOpenStat; window.srvCloseStat=srvCloseStat;
+
+// ── BUTONUL „ÎNAPOI" AL TELEFONULUI ──────────────────────────────────
+// Înapoi = închide fereastra deschisă; din alt tab = întoarce la tabul principal;
+// din tabul principal (aplicație instalată) = cere o a doua apăsare pentru ieșire.
+(function(){
+  const CLOSERS={
+    'srv-modal-istoric-masina':()=>srvmClose(), 'modal-printcheck':()=>closePrintCheck(),
+    'modal-driver':()=>closeModalDriver(), 'modal-log':()=>closeModalLog(), 'modal-addlog':()=>closeModalAddLog(),
+    'modal-edit':()=>closeModalEdit(), 'srv-modal-task':()=>srvCloseTaskModal(), 'srv-modal-complete':()=>srvCloseComplete(),
+    'srv-modal-stoc':()=>stocCloseModal(), 'srv-modal-edit':()=>srvCloseEdit(), 'srv-modal-stat':()=>srvCloseStat()
+  };
+  const standalone = (window.matchMedia&&matchMedia('(display-mode: standalone)').matches) || navigator.standalone===true;
+  const openList=()=>[...document.querySelectorAll('.modal-overlay.open')];
+  let pushed=0, ignore=0, exitArmed=false, exitTimer=null;
+  try{ history.replaceState({base:1},''); if(standalone) history.pushState({guard:1},''); }catch(e){}
+  function sync(){
+    const n=openList().length;
+    while(pushed<n){ try{ history.pushState({m:pushed+1},''); }catch(e){} pushed++; }
+    if(pushed>n){ const d=pushed-n; pushed=n; ignore++; try{ history.go(-d); }catch(e){ ignore--; } }
+  }
+  new MutationObserver(sync).observe(document.body,{subtree:true,attributes:true,attributeFilter:['class']});
+  function currentHome(){
+    const svc=document.getElementById('app-service');
+    if(svc && svc.style.display!=='none'){
+      const vis=['active','taskuri','istoric','adauga','masini','stoc','garantie','backup','admin'].find(t=>{const e=document.getElementById('srv-tab-'+t);return e&&e.style.display!=='none';});
+      return {svc:true, tab:vis||'active'};
+    }
+    const vis=['masini','disponibil','log','amenda','soferi','setari','stricate','admin','backup-flota'].find(t=>{const e=document.getElementById('tab-'+t);return e&&e.style.display!=='none';});
+    return {svc:false, tab:vis||'masini'};
+  }
+  window.addEventListener('popstate',()=>{
+    if(ignore>0){ ignore--; return; }
+    const open=openList();
+    if(open.length){
+      pushed=Math.max(0,pushed-1);
+      const top=open[open.length-1];
+      const fn=CLOSERS[top.id];
+      if(fn){ try{fn();}catch(e){ top.classList.remove('open'); } } else top.classList.remove('open');
+      if(top.classList.contains('open')) top.classList.remove('open');
+      return;
+    }
+    if(!standalone) return;   // în browser lăsăm „înapoi" normal; doar ferestrele se închid
+    const h=currentHome();
+    const homeTab=h.svc?'active':'masini';
+    try{ history.pushState({guard:1},''); }catch(e){}
+    if(h.tab!==homeTab){
+      if(h.svc) showSrvTab(homeTab); else showTab(homeTab);
+      return;
+    }
+    if(exitArmed){ exitArmed=false; clearTimeout(exitTimer); ignore+=0; try{ history.go(-2); }catch(e){} return; }
+    exitArmed=true; toast('Apasă încă o dată „înapoi" pentru a ieși');
+    clearTimeout(exitTimer); exitTimer=setTimeout(()=>{exitArmed=false;},2500);
+  });
+})();
+
 function srvCloseTaskModal(){
   document.getElementById('srv-modal-task').classList.remove('open');
   editingTaskId = null;
@@ -6098,7 +6216,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261021-104204';
+const APP_VERSION='20261021-121128';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
