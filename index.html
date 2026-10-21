@@ -987,6 +987,7 @@ body.user-mode .log-mobile-card {
 
   <!-- Tab Stoc piese -->
   <div id="srv-tab-stoc" style="display:none">
+    <div id="stoc-owner-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
       <input id="stoc-search" placeholder="caută piesă..." oninput="renderStoc()" style="flex:1;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:14px;padding:9px 12px;outline:none;min-width:140px">
       <select id="stoc-filter-cat" onchange="renderStoc()" style="background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px;padding:9px 12px;outline:none">
@@ -994,6 +995,7 @@ body.user-mode .log-mobile-card {
         <option value="Filtre">Filtre</option>
         <option value="Ulei">Ulei</option>
         <option value="Frâne">Frâne</option>
+        <option value="Cauciucuri">Cauciucuri</option>
         <option value="Curea">Curea</option>
         <option value="Bujii">Bujii</option>
         <option value="Lichide">Lichide</option>
@@ -1203,16 +1205,24 @@ body.user-mode .log-mobile-card {
   <div class="modal">
     <div class="modal-title" id="stoc-modal-title">Piesă nouă</div>
     <div class="modal-field">
+      <div class="modal-label">Stoc pentru (locația mecanicului)</div>
+      <select id="stoc-new-owner">
+        <option value="ion-srv">Ioan</option>
+        <option value="vasile-srv">Vasile</option>
+      </select>
+    </div>
+    <div class="modal-field">
       <div class="modal-label">Denumire piesă</div>
       <input id="stoc-new-nume" placeholder="ex: Filtru aer">
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div class="modal-field">
         <div class="modal-label">Categorie</div>
-        <select id="stoc-new-cat">
+        <select id="stoc-new-cat" onchange="stocToggleTireFields()">
           <option value="Filtre">Filtre</option>
           <option value="Ulei">Ulei</option>
           <option value="Frâne">Frâne</option>
+          <option value="Cauciucuri">Cauciucuri</option>
           <option value="Curea">Curea</option>
           <option value="Bujii">Bujii</option>
           <option value="Lichide">Lichide</option>
@@ -1227,6 +1237,21 @@ body.user-mode .log-mobile-card {
           <option value="ELEKTRO">ELEKTRO</option>
           <option value="ALTELE">ALTELE</option>
           <option value="Universal">Universal (toate)</option>
+        </select>
+      </div>
+    </div>
+    <div id="stoc-tire-fields" style="display:none;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="modal-field">
+        <div class="modal-label">Mărime cauciuc *</div>
+        <input id="stoc-new-marime" placeholder="ex: 235/65 R16C" style="font-family:var(--mono)">
+      </div>
+      <div class="modal-field">
+        <div class="modal-label">Sezon</div>
+        <select id="stoc-new-sezon">
+          <option value="">—</option>
+          <option value="Vară">Vară</option>
+          <option value="Iarnă">Iarnă</option>
+          <option value="All-season">All-season</option>
         </select>
       </div>
     </div>
@@ -3931,6 +3956,14 @@ async function requestNotificationPermission(){
 // ── STOC PIESE ───────────────────────────────────────────────
 // ═════════════════════════════════════════════════════════════
 let editingStocId = null;
+let stocView = '';
+function stocSetView(k){ stocView=k; renderStoc(); }
+window.stocSetView=stocSetView;
+function stocToggleTireFields(){
+  const on=document.getElementById('stoc-new-cat').value==='Cauciucuri';
+  document.getElementById('stoc-tire-fields').style.display=on?'grid':'none';
+}
+window.stocToggleTireFields=stocToggleTireFields;
 
 function renderStoc(){
   const sec = document.getElementById('stoc-section');
@@ -3940,8 +3973,20 @@ function renderStoc(){
   if(addBtn) addBtn.style.display = canEditStoc() ? '' : 'none';
   const q = (document.getElementById('stoc-search')?.value||'').toLowerCase();
   const cat = document.getElementById('stoc-filter-cat')?.value || '';
-  let list = stoc.slice();
-  if(q) list = list.filter(s=>(s.nume||'').toLowerCase().includes(q)||(s.compatibil||'').toLowerCase().includes(q)||(s.cod||'').toLowerCase().includes(q)||(s.aniCompatibili||'').toLowerCase().includes(q));
+  // Stoc separat pe mecanic (Ioan / Vasile)
+  const myUser=currentUser?.username||'';
+  const mecUsers=['ion-srv','vasile-srv'];
+  const mecanic=isSrvMecanic();
+  if(mecanic && mecUsers.includes(myUser)) stocView=myUser;           // mecanicul vede doar stocul lui
+  else if(!stocView) stocView='all';
+  const tabsEl=document.getElementById('stoc-owner-tabs');
+  if(tabsEl){
+    const cnt=o=>stoc.filter(s=>o==='all'||s.owner===o||!s.owner).length;
+    const tabs=mecanic&&mecUsers.includes(myUser)?[[myUser,'Stocul meu']]:[['all','Toate'],['ion-srv','Stoc Ioan'],['vasile-srv','Stoc Vasile']];
+    tabsEl.innerHTML=tabs.map(([k,l])=>`<button class="filter-btn${stocView===k?' active':''}" onclick="stocSetView('${k}')">${l} <b style="font-family:var(--mono)">${cnt(k)}</b></button>`).join('');
+  }
+  let list = stoc.filter(s=>stocView==='all' || s.owner===stocView || !s.owner);
+  if(q) list = list.filter(s=>(s.marime||'').toLowerCase().includes(q)||(s.sezon||'').toLowerCase().includes(q)||(s.nume||'').toLowerCase().includes(q)||(s.compatibil||'').toLowerCase().includes(q)||(s.cod||'').toLowerCase().includes(q)||(s.aniCompatibili||'').toLowerCase().includes(q));
   if(cat) list = list.filter(s=>s.categorie===cat);
   list.sort((a,b)=>(a.categorie||'').localeCompare(b.categorie||'')||(a.nume||'').localeCompare(b.nume||''));
   if(list.length===0){
@@ -3959,6 +4004,9 @@ function renderStoc(){
           <div style="flex:1;min-width:0">
             <div style="font-size:13px;font-weight:500">${s.nume}</div>
             <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap">
+              ${s.marime?`<span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:3px;background:rgba(18,24,38,.08);color:var(--text);font-family:var(--mono)">⭕ ${s.marime}</span>`:''}
+              ${s.sezon?`<span style="font-size:10px;padding:2px 7px;border-radius:3px;background:rgba(100,100,100,.1);color:var(--text2)">${s.sezon}</span>`:''}
+              ${s.owner?`<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;background:rgba(74,158,255,.12);color:#2f7fd6">${s.owner==='ion-srv'?'Ioan':s.owner==='vasile-srv'?'Vasile':s.owner}</span>`:'<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;background:rgba(255,159,74,.15);color:var(--t6)">nealocat — alege stocul</span>'}
               <span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;background:${tipColor}22;color:${tipColor};font-family:var(--mono)">${tipLabel}</span>
               ${s.aniCompatibili?`<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;background:rgba(100,100,100,.1);color:var(--text2);font-family:var(--mono)">${s.aniCompatibili}</span>`:''}
               <span style="font-size:11px;color:var(--text3)">${s.categorie||'—'}</span>
@@ -3984,6 +4032,10 @@ function stocOpenAdd(){
   ['stoc-new-nume','stoc-new-cant','stoc-new-pret','stoc-new-cod','stoc-new-ani'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('stoc-new-cat').value='Filtre';
   document.getElementById('stoc-new-compat').value='CRAFTER';
+  document.getElementById('stoc-new-marime').value=''; document.getElementById('stoc-new-sezon').value='';
+  const _mu=['ion-srv','vasile-srv'];
+  document.getElementById('stoc-new-owner').value = (isSrvMecanic()&&_mu.includes(currentUser?.username)) ? currentUser.username : (_mu.includes(stocView)?stocView:'ion-srv');
+  stocToggleTireFields();
   document.getElementById('srv-modal-stoc').classList.add('open');
 }
 
@@ -4000,17 +4052,27 @@ function stocOpenEdit(id){
   document.getElementById('stoc-new-compat').value=s.compatibil||'CRAFTER';
   document.getElementById('stoc-new-cod').value=s.cod||'';
   document.getElementById('stoc-new-ani').value=s.aniCompatibili||'';
+  document.getElementById('stoc-new-marime').value=s.marime||''; document.getElementById('stoc-new-sezon').value=s.sezon||'';
+  document.getElementById('stoc-new-owner').value=s.owner||(['ion-srv','vasile-srv'].includes(stocView)?stocView:'ion-srv');
+  stocToggleTireFields();
   document.getElementById('srv-modal-stoc').classList.add('open');
 }
 
 function stocCloseModal(){document.getElementById('srv-modal-stoc').classList.remove('open');editingStocId=null;}
 
 function stocSave(){
-  const nume=document.getElementById('stoc-new-nume').value.trim();
+  let nume=document.getElementById('stoc-new-nume').value.trim();
+  const _cat=document.getElementById('stoc-new-cat').value;
+  const _marime=document.getElementById('stoc-new-marime').value.trim();
+  if(_cat==='Cauciucuri' && !_marime){toast('Scrie mărimea cauciucului (ex: 235/65 R16C)');return;}
+  if(!nume && _cat==='Cauciucuri') nume='Cauciuc';
   if(!nume){toast('Adaugă denumirea');return;}
   const obj={
     id:editingStocId||stocIdCtr++,
     nume,
+    owner:document.getElementById('stoc-new-owner').value||'ion-srv',
+    marime:_cat==='Cauciucuri'?(_marime||null):null,
+    sezon:_cat==='Cauciucuri'?(document.getElementById('stoc-new-sezon').value||null):null,
     categorie:document.getElementById('stoc-new-cat').value,
     cantitate:parseInt(document.getElementById('stoc-new-cant').value)||0,
     pret:parseFloat(document.getElementById('stoc-new-pret').value)||null,
@@ -4037,6 +4099,12 @@ function stocDelete(){
 // ── PIESE DIN STOC (selector) ────────────────────────────────
 // ═════════════════════════════════════════════════════════════
 const _pk = {add:[], task:[], done:[], edit:[]};
+const _pkOwnerGetter = {
+  add:  ()=> isSrvMecanic() ? (currentUser?.username||'') : (document.getElementById('pk-owner-add')?.value||'ion-srv'),
+  task: ()=> document.getElementById('srv-task-asignat')?.value||'',
+  done: ()=>{ if(isSrvMecanic()) return currentUser?.username||''; const t=taskuri.find(x=>x.id===completingTaskId); return t?t.asignat:''; },
+  edit: ()=>{ if(isSrvMecanic()) return currentUser?.username||''; const r=reparatii.find(x=>x.id===editingRepId); return (r&&r.addedByUsername)||'ion-srv'; }
+};
 const _pkTipGetter = {
   add:  ()=>{ const m=masini.find(x=>x.id===parseInt(document.getElementById('srv-new-masina')?.value)); return m?m.tip:''; },
   task: ()=>{ const m=masini.find(x=>x.id===parseInt(document.getElementById('srv-task-masina')?.value)); return m?m.tip:''; },
@@ -4071,10 +4139,12 @@ function pkRender(key){
   const box=document.getElementById('pk-'+key); if(!box) return;
   const tip=_pkTipGetter[key]();
   const usedIds=new Set(_pk[key].map(x=>x.stocId));
+  const owner=_pkOwnerGetter[key]();
   const opts=stoc.filter(s=>!usedIds.has(s.id))
+    .filter(s=>!owner || !s.owner || s.owner===owner)
     .filter(s=>pkCompatible(s,tip))
     .sort((a,b)=>(a.categorie||'').localeCompare(b.categorie||'')||(a.nume||'').localeCompare(b.nume||''))
-    .map(s=>`<option value="${s.id}">${pkEsc(s.nume)}${s.compatibil?' ['+pkEsc(s.compatibil)+']':''} — ${s.cantitate} buc</option>`).join('');
+    .map(s=>`<option value="${s.id}">${pkEsc(s.nume)}${s.marime?' '+pkEsc(s.marime):''}${s.sezon?' ('+pkEsc(s.sezon)+')':''}${s.compatibil?' ['+pkEsc(s.compatibil)+']':''} — ${s.cantitate} buc</option>`).join('');
   const chips=_pk[key].map((x,i)=>{
     const st=stoc.find(s=>s.id===x.stocId);
     const low = st && st.cantitate < x.qty;
@@ -4083,8 +4153,9 @@ function pkRender(key){
       <span style="flex:1;min-width:0">${pkEsc(x.nume)} <b style="font-family:var(--mono)">× ${x.qty}</b>${bad?' <span style="color:var(--danger);font-size:11px;font-weight:600">⚠ nu se potrivește ('+pkEsc(st&&st.compatibil||'?')+')</span>':''}${low?' <span style="color:var(--danger);font-size:11px">⚠ în stoc: '+st.cantitate+'</span>':''}</span>
       <button type="button" onclick="pkRemove('${key}',${i})" style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;line-height:1">×</button></div>`;
   }).join('');
+  const ownerSel = (key==='add' && !isSrvMecanic()) ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;color:var(--text2)">Din stocul lui: <select id="pk-owner-add" style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-size:13px;padding:6px 8px"><option value="ion-srv"${owner==='ion-srv'?' selected':''}>Ioan</option><option value="vasile-srv"${owner==='vasile-srv'?' selected':''}>Vasile</option></select></div>` : '';
   const noCar = !tip;
-  box.innerHTML = chips + (noCar && key!=='done' && key!=='edit' ? '<div style="font-size:12px;color:var(--text3)">Alege mai întâi mașina, ca să vezi piesele potrivite.</div>' : stoc.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap">
+  box.innerHTML = ownerSel + chips + (noCar && key!=='done' && key!=='edit' ? '<div style="font-size:12px;color:var(--text3)">Alege mai întâi mașina, ca să vezi piesele potrivite.</div>' : stoc.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap">
       <select id="pk-sel-${key}" style="flex:1;min-width:160px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-size:14px;padding:9px 10px"><option value="">— alege piesa din stoc —</option>${opts}</select>
       <input id="pk-qty-${key}" type="number" min="1" value="1" style="width:64px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:14px;padding:9px 8px">
       <button type="button" class="btn" onclick="pkAdd('${key}')" style="flex:none;width:auto">+ Adaugă</button></div>`
@@ -4096,7 +4167,7 @@ function pkAdd(key){
   if(!id){ toast('Alege piesa'); return; }
   const st=stoc.find(s=>s.id===id); if(!st) return;
   if(!pkCompatible(st,_pkTipGetter[key]())){ toast('⚠ Piesa „'+st.nume+'" este pentru '+(st.compatibil||'alt model')+', nu pentru această mașină'); return; }
-  _pk[key].push({stocId:id, nume:st.nume, qty});
+  _pk[key].push({stocId:id, nume:st.nume+(st.marime?' '+st.marime:''), qty});
   pkRender(key);
 }
 function pkRemove(key,i){ _pk[key].splice(i,1); pkRender(key); }
@@ -4116,6 +4187,19 @@ function pkDeduct(list){
   return short;
 }
 document.addEventListener('change',e=>{
+  if(e.target.id==='pk-owner-add'){
+    const ow=e.target.value; const before=_pk.add.length;
+    _pk.add=_pk.add.filter(x=>{ const st=stoc.find(q=>q.id===x.stocId); return !st||!st.owner||st.owner===ow; });
+    if(_pk.add.length<before) toast('Am scos piesele din stocul celuilalt mecanic');
+    pkRender('add'); return;
+  }
+  if(e.target.id==='srv-task-asignat'){
+    const ow=e.target.value;
+    const before=_pk.task.length;
+    _pk.task=_pk.task.filter(x=>{ const st=stoc.find(q=>q.id===x.stocId); return !st||!st.owner||st.owner===ow; });
+    if(_pk.task.length<before) toast('Am scos piesele din stocul celuilalt mecanic');
+    pkRender('task'); return;
+  }
   const key = e.target.id==='srv-new-masina' ? 'add' : e.target.id==='srv-task-masina' ? 'task' : null;
   if(!key) return;
   const bad=pkMismatches(key);
@@ -6223,7 +6307,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261021-122748';
+const APP_VERSION='20261021-144932';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
