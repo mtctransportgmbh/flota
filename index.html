@@ -190,6 +190,26 @@ button{font-family:inherit;}
 /* ── SETARI ────────────────────────────────────────── */
 .settings-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:14px;}
 .settings-title{font-size:14px;font-weight:500;margin-bottom:14px;color:var(--text);}
+.bm-hero{display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:12px}
+.bm-dot{width:14px;height:14px;border-radius:50%;flex:none;box-shadow:0 0 0 5px rgba(0,0,0,.05)}
+.bm-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.bm-chip{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:5px 11px;font-size:12px;color:var(--text2)}
+.bm-chip b{font-family:var(--mono);color:var(--text);font-weight:500;margin-left:3px}
+.bm-day{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin:16px 2px 8px}
+.bm-row{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:11px 14px;margin-bottom:8px;flex-wrap:wrap}
+.bm-ico{width:38px;height:38px;border-radius:10px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:19px;flex:none}
+.bm-main{flex:1;min-width:190px}
+.bm-title{font-size:14px;font-weight:500}
+.bm-title span{font-family:var(--mono);color:var(--text2);margin-right:6px}
+.bm-meta{font-size:11px;color:var(--text3);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap;font-family:var(--mono)}
+.bm-act{display:flex;gap:6px}
+.bm-act button{background:none;border:1px solid var(--border2);color:var(--text2);cursor:pointer;font-size:13px;padding:6px 11px;border-radius:6px}
+.bm-act .bm-rest{border-color:rgba(46,158,91,.5);color:#2e9e5b}
+.bm-act .bm-del{border-color:rgba(255,90,90,.3);color:var(--danger)}
+.bm-sec{display:flex;gap:10px;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;cursor:pointer}
+.bm-sec input{width:18px;height:18px;flex:none}
+.bm-sec small{display:block;color:var(--text3);font-size:11px;font-family:var(--mono);margin-top:2px}
+
 .settings-row{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
 .settings-row input,.settings-row select{flex:1;min-width:140px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:14px;padding:10px 12px;outline:none;}
 
@@ -679,17 +699,17 @@ body.user-mode .log-mobile-card {
       <span style="font-size:16px">💾</span>
       <span>Ultimul backup: <strong style="color:var(--accent)" id="flota-backup-last-ts">—</strong></span>
     </div>
-    <div class="settings-section">
-      <div class="settings-title">Backup date flotă</div>
-      <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:14px">
-        Se păstrează ultimele <strong style="color:var(--text)">10 backup-uri</strong>. Backup automat la fiecare modificare. Backup manual oricând.
+    <div id="bm-root-flota"></div>
+    <details class="settings-section" style="margin-top:6px">
+      <summary style="cursor:pointer;font-size:13px;color:var(--text2)">Backup-uri vechi din aplicație (ultimele 10)</summary>
+      <div style="margin-top:14px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+          <button class="btn" onclick="flotaBackupManual()" style="flex:none;width:auto">💾 Backup în aplicație</button>
+          <button class="btn" onclick="flotaBackupExportLast()" style="flex:none;width:auto">⬇ Export ultimul (JSON)</button>
+        </div>
+        <div id="flota-backup-list-section"></div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
-        <button class="btn btn-primary" onclick="flotaBackupManual()" style="flex:none;width:auto">💾 Backup manual acum</button>
-        <button class="btn" onclick="flotaBackupExportLast()" style="flex:none;width:auto">⬇ Export ultimul (JSON)</button>
-      </div>
-      <div id="flota-backup-list-section"></div>
-    </div>
+    </details>
   </div>
 
   <!-- ── TAB STRICATE ─────────────────────────────────────── -->
@@ -1019,17 +1039,17 @@ body.user-mode .log-mobile-card {
 
   <!-- Tab Backup -->
   <div id="srv-tab-backup" style="display:none">
-    <div class="settings-section">
-      <div class="settings-title">Backup date</div>
-      <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:14px">
-        Se păstrează ultimele <strong style="color:var(--text)">5 backup-uri</strong>. Backup automat la fiecare modificare importantă (șoferi, sarcini). Backup manual oricând.
+    <div id="bm-root-srv"></div>
+    <details class="settings-section" style="margin-top:6px">
+      <summary style="cursor:pointer;font-size:13px;color:var(--text2)">Backup-uri vechi din aplicație</summary>
+      <div style="margin-top:14px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+          <button class="btn" onclick="backupManual()" style="flex:none;width:auto">💾 Backup în aplicație</button>
+          <button class="btn" onclick="backupExportLast()" style="flex:none;width:auto">⬇ Export ultimul (JSON)</button>
+        </div>
+        <div id="backup-list-section"></div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px">
-        <button class="btn btn-primary" onclick="backupManual()" style="flex:none;width:auto">💾 Backup manual acum</button>
-        <button class="btn" onclick="backupExportLast()" style="flex:none;width:auto">⬇ Export ultimul backup (JSON)</button>
-      </div>
-      <div id="backup-list-section"></div>
-    </div>
+    </details>
   </div>
 
   <!-- Tab Admin Service -->
@@ -1565,6 +1585,18 @@ body.user-mode .log-mobile-card {
 <!-- ──────────────────────────────────────────────────────────── -->
 <!-- Încarcă configurația din fișierul config.js (separat) -->
 <script src="config.js"></script>
+
+<!-- Manager backup: restaurare -->
+<div class="modal-overlay" id="bm-modal-restore" onclick="if(event.target===this)bmRestoreClose()">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-title">↩ Restaurează backup</div>
+    <div id="bm-restore-body"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="bmRestoreClose()">Anulează</button>
+      <button class="btn btn-primary" id="bm-restore-go" onclick="bmRestoreGo()" disabled>Restaurează selecția</button>
+    </div>
+  </div>
+</div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -4677,6 +4709,144 @@ function renderFlotaBackupList(){
     '<div style="margin-top:14px"><button class="btn" onclick="flotaBackupRestoreFromFile()" style="flex:none;width:auto">⬆ Restaurează din fișier</button></div>';
 }
 
+// ── MANAGER BACKUP (copii automate pe server, dimineața și seara) ──
+const BM={items:null,loading:false,err:'',filter:'all',restoreId:null};
+const BM_KINDS={'auto-dimineata':['🌅','Automat · dimineață'],'auto-seara':['🌙','Automat · seară'],'manual':['✋','Manual'],'inainte-de-restaurare':['🛟','Înainte de restaurare']};
+const BM_SECS=[
+  ['flota','🚗 Flotă','mașini, șoferi, log',[['masini','mașini'],['soferi','șoferi'],['log','log']]],
+  ['service','🔧 Service','reparații, sarcini',[['reparatii','reparații'],['taskuri','sarcini']]],
+  ['stoc','🔩 Stoc','piese + istoric + alertă mail',[['stoc','piese'],['stocLog','mișcări']]],
+  ['garantii','🛡 Garanții','',[['garantii','garanții']]]
+];
+function bmNow(){return {masini:masini.length,soferi:soferi.length,log:log.length,reparatii:reparatii.length,taskuri:taskuri.length,stoc:stoc.length,stocLog:stocLog.length,garantii:garantii.length};}
+async function bmCall(body){
+  const user=window.fbAuth&&window.fbAuth.currentUser; if(!user) throw new Error('nu ești autentificat');
+  const tok=await user.getIdToken();
+  const url='https://europe-west1-'+window.fbAuth.app.options.projectId+'.cloudfunctions.net/backupApi';
+  let r; try{ r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify(body)}); }
+  catch(e){ throw new Error('funcția de backup nu răspunde — urc-o cu „firebase deploy --only functions"'); }
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok||!j.ok) throw new Error(j.error||('eroare '+r.status));
+  return j;
+}
+async function bmLoad(){
+  if(!isAdminUser) return;
+  BM.loading=true; bmRender();
+  try{ const j=await bmCall({action:'list'}); BM.items=j.items; BM.err=''; }
+  catch(e){ BM.err=e.message||String(e); }
+  BM.loading=false; bmRender();
+}
+function bmSetFilter(f){ BM.filter=f; bmRender(); }
+function bmFmtTime(d){ const p=n=>String(n).padStart(2,'0'); return p(d.getHours())+':'+p(d.getMinutes()); }
+function bmDayLabel(d){
+  const t=new Date(); const k=x=>x.getFullYear()*400+x.getMonth()*32+x.getDate();
+  const y=new Date(t); y.setDate(t.getDate()-1);
+  const base=d.toLocaleDateString('ro-RO',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  return k(d)===k(t)?'Azi · '+base:k(d)===k(y)?'Ieri · '+base:base;
+}
+function bmNextLabel(){
+  const h=parseInt(new Date().toLocaleString('en-GB',{timeZone:'Europe/Berlin',hour:'2-digit',hour12:false}),10);
+  return h<6?'azi la 06:00':h<20?'azi la 20:00':'mâine la 06:00';
+}
+function bmCountsHtml(c){
+  c=c||{};
+  const it=[['🚗','mașini','masini'],['👤','șoferi','soferi'],['📋','log','log'],['🔧','reparații','reparatii'],['✅','sarcini','taskuri'],['🔩','piese','stoc']];
+  return it.map(([i,t,k])=>`<span title="${t}">${i} ${c[k]==null?'–':c[k]}</span>`).join('');
+}
+function bmRender(){
+  const html=bmHtml();
+  ['bm-root-flota','bm-root-srv'].forEach(id=>{const el=document.getElementById(id); if(el) el.innerHTML=html;});
+}
+function bmHtml(){
+  if(!isAdminUser) return '';
+  const now=bmNow();
+  const chips=[['🚗 Mașini',now.masini],['👤 Șoferi',now.soferi],['📋 Log',now.log],['🔧 Reparații',now.reparatii],['✅ Sarcini',now.taskuri],['🔩 Piese stoc',now.stoc],['📜 Mișcări stoc',now.stocLog],['🛡 Garanții',now.garantii]]
+    .map(([l,v])=>`<span class="bm-chip">${l}<b>${v}</b></span>`).join('');
+  let hero;
+  const items=BM.items;
+  if(BM.err){
+    hero=`<div class="bm-hero" style="border-color:rgba(255,90,90,.4)"><span class="bm-dot" style="background:var(--danger)"></span><div style="flex:1;min-width:200px"><div style="font-weight:500;font-size:14px">Nu pot citi backup-urile</div><div style="font-size:12px;color:var(--text2);margin-top:3px">${bmEsc(BM.err)}</div></div><button class="btn" onclick="bmLoad()" style="flex:none;width:auto">↻ Reîncearcă</button></div>`;
+  } else if(!items){
+    hero=`<div class="bm-hero"><span class="bm-dot" style="background:var(--text3)"></span><div style="flex:1;color:var(--text2);font-size:14px">${BM.loading?'Se încarcă backup-urile…':'—'}</div></div>`;
+  } else {
+    const last=items.find(x=>x.kind&&x.kind.startsWith('auto'))||items[0];
+    let col='#2e9e5b',head='Totul în regulă',sub='';
+    if(!last){ col='#d33'; head='Niciun backup încă'; sub='Primul se face automat la 06:00 sau 20:00 — sau apasă „Backup acum".'; }
+    else{
+      const ageH=(Date.now()-new Date(last.ts).getTime())/36e5;
+      const d=new Date(last.ts);
+      sub=`Ultimul automat: ${d.toLocaleDateString('ro-RO',{day:'numeric',month:'short'})} ${bmFmtTime(d)} · următorul ${bmNextLabel()}`;
+      if(ageH>26){ col='#d33'; head='Backup-ul automat întârzie'; sub+=' · verifică funcțiile din Firebase'; }
+      else if(ageH>14){ col='#d68a00'; head='Backup-ul e mai vechi decât de obicei'; }
+    }
+    const tot=items.reduce((a,x)=>a+(x.bytes||0),0);
+    hero=`<div class="bm-hero"><span class="bm-dot" style="background:${col}"></span>
+      <div style="flex:1;min-width:200px"><div style="font-weight:500;font-size:15px">${head}</div><div style="font-size:12px;color:var(--text2);margin-top:3px">${sub}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px">${items.length} backup-uri · ${(tot/1024).toFixed(0)} KB · automate la 06:00 și 20:00, păstrate 60 de zile</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="bmCreate()" style="flex:none;width:auto">💾 Backup acum</button><button class="btn" onclick="bmLoad()" style="flex:none;width:auto" title="Reîncarcă lista">↻</button></div></div>`;
+  }
+  let list='';
+  if(items){
+    const F=[['all','Toate'],['auto-dimineata','🌅 Dimineață'],['auto-seara','🌙 Seară'],['manual','✋ Manual'],['inainte-de-restaurare','🛟 Dinainte de restaurare']];
+    const filt=F.map(([k,l])=>`<button class="filter-btn${BM.filter===k?' active':''}" onclick="bmSetFilter('${k}')">${l}</button>`).join('');
+    const rows=items.filter(x=>BM.filter==='all'||x.kind===BM.filter);
+    let curDay='',body='';
+    rows.forEach((x,i)=>{
+      const d=new Date(x.ts); const dl=bmDayLabel(d);
+      if(dl!==curDay){ curDay=dl; body+=`<div class="bm-day">${dl}</div>`; }
+      const [ic,lb]=BM_KINDS[x.kind]||['💾',x.kind||'—'];
+      body+=`<div class="bm-row"><div class="bm-ico">${ic}</div>
+        <div class="bm-main"><div class="bm-title"><span>${bmFmtTime(d)}</span>${lb}${x.by&&x.by!=='sistem'?' · '+bmEsc(x.by):''}</div>
+        <div class="bm-meta">${bmCountsHtml(x.counts)}<span>${((x.size||0)/1024).toFixed(0)} KB</span></div></div>
+        <div class="bm-act"><button class="bm-rest" onclick="bmRestoreOpen('${x.id}')" title="Restaurează">↩ Restaurează</button><button onclick="bmDownload('${x.id}')" title="Descarcă JSON">⬇</button><button class="bm-del" onclick="bmDelete('${x.id}')" title="Șterge">🗑</button></div></div>`;
+    });
+    list=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 2px">${filt}</div>`+(body||'<div style="padding:24px;text-align:center;color:var(--text3);font-size:13px">Niciun backup în această categorie.</div>');
+  }
+  return `<div style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin:2px 2px 8px">Date acum în aplicație</div><div class="bm-chips">${chips}</div>`+hero+list;
+}
+function bmEsc(x){return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+async function bmCreate(){
+  try{ toast('Se creează backup-ul…'); await bmCall({action:'create'}); toast('✓ Backup creat'); await bmLoad(); }
+  catch(e){ toast('Eroare backup: '+(e.message||e)); }
+}
+async function bmDownload(id){
+  try{
+    const j=await bmCall({action:'get',id});
+    const d=new Date(j.ts); const p=n=>String(n).padStart(2,'0');
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([j.json],{type:'application/json'}));
+    a.download=`backup_mtc_${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}.json`;
+    document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
+  }catch(e){ toast('Eroare: '+(e.message||e)); }
+}
+async function bmDelete(id){
+  if(!confirm('Ștergi definitiv acest backup?')) return;
+  try{ await bmCall({action:'delete',id}); toast('Backup șters'); await bmLoad(); }catch(e){ toast('Eroare: '+(e.message||e)); }
+}
+function bmRestoreOpen(id){
+  const x=(BM.items||[]).find(i=>i.id===id); if(!x) return;
+  BM.restoreId=id; const now=bmNow(); const d=new Date(x.ts);
+  const secs=BM_SECS.map(([k,l,sub,fields])=>{
+    const cmp=fields.map(([f,n])=>`${n}: <b>${(x.counts||{})[f]==null?'–':x.counts[f]}</b> în backup / <b>${now[f]}</b> acum`).join(' · ');
+    return `<label class="bm-sec"><input type="checkbox" value="${k}" onchange="bmRestoreChk()"><div><div style="font-size:14px;font-weight:500">${l}${sub?' <span style="font-weight:400;color:var(--text3);font-size:12px">— '+sub+'</span>':''}</div><small>${cmp}</small></div></label>`;
+  }).join('');
+  document.getElementById('bm-restore-body').innerHTML=`<div style="font-size:13px;color:var(--text2);line-height:1.55;margin-bottom:12px">Backup din <b style="color:var(--text)">${d.toLocaleDateString('ro-RO',{day:'numeric',month:'long',year:'numeric'})}, ${bmFmtTime(d)}</b>. Alege ce vrei să readuci. Ce nu bifezi rămâne neschimbat (inclusiv utilizatorii și parolele). Înainte de restaurare se face automat un backup de siguranță cu starea de acum.</div>${secs}`;
+  document.getElementById('bm-restore-go').disabled=true;
+  document.getElementById('bm-modal-restore').classList.add('open');
+}
+function bmRestoreChk(){ document.getElementById('bm-restore-go').disabled=!document.querySelector('#bm-restore-body input:checked'); }
+function bmRestoreClose(){ document.getElementById('bm-modal-restore').classList.remove('open'); }
+async function bmRestoreGo(){
+  const sections=[...document.querySelectorAll('#bm-restore-body input:checked')].map(i=>i.value);
+  if(!sections.length) return;
+  if(!confirm('Restaurezi: '+sections.join(', ')+'?\nDatele de acum din aceste secțiuni vor fi înlocuite (se face întâi un backup de siguranță).')) return;
+  const btn=document.getElementById('bm-restore-go'); btn.disabled=true; btn.textContent='Se restaurează…';
+  try{
+    await bmCall({action:'restore',id:BM.restoreId,sections});
+    toast('✓ Restaurat. Se reîncarcă aplicația…'); setTimeout(()=>location.reload(),1300);
+  }catch(e){ toast('Eroare: '+(e.message||e)); btn.disabled=false; btn.textContent='Restaurează selecția'; }
+}
+Object.assign(window,{bmLoad,bmSetFilter,bmCreate,bmDownload,bmDelete,bmRestoreOpen,bmRestoreChk,bmRestoreClose,bmRestoreGo});
+
 // ── BACKUP SERVICE ─────────────────────────────────────────────
 // ═════════════════════════════════════════════════════════════
 const MAX_BACKUPS=5;
@@ -5925,7 +6095,7 @@ window.srvOpenStat=srvOpenStat; window.srvCloseStat=srvCloseStat;
     'srv-modal-istoric-masina':()=>srvmClose(), 'modal-printcheck':()=>closePrintCheck(),
     'modal-driver':()=>closeModalDriver(), 'modal-log':()=>closeModalLog(), 'modal-addlog':()=>closeModalAddLog(),
     'modal-edit':()=>closeModalEdit(), 'srv-modal-task':()=>srvCloseTaskModal(), 'srv-modal-complete':()=>srvCloseComplete(),
-    'srv-modal-stoc':()=>stocCloseModal(), 'srv-modal-edit':()=>srvCloseEdit(), 'srv-modal-stat':()=>srvCloseStat(), 'srv-modal-stoc-log':()=>stocLogClose(), 'srv-modal-stoc-alert':()=>stocAlertClose()
+    'srv-modal-stoc':()=>stocCloseModal(), 'srv-modal-edit':()=>srvCloseEdit(), 'srv-modal-stat':()=>srvCloseStat(), 'srv-modal-stoc-log':()=>stocLogClose(), 'srv-modal-stoc-alert':()=>stocAlertClose(), 'bm-modal-restore':()=>bmRestoreClose()
   };
   const standalone = (window.matchMedia&&matchMedia('(display-mode: standalone)').matches) || navigator.standalone===true;
   const openList=()=>[...document.querySelectorAll('.modal-overlay.open')];
@@ -6517,6 +6687,11 @@ window.selectMode=selectMode;
 window.backToModeSelect=backToModeSelect;
 // Service mode
 window.showSrvTab=showSrvTab;
+(function(){
+  const t1=window.showTab, t2=window.showSrvTab;
+  window.showTab=function(n){ const r=t1.apply(this,arguments); if(n==='backup-flota') bmLoad(); return r; };
+  window.showSrvTab=function(n){ const r=t2.apply(this,arguments); if(n==='backup') bmLoad(); return r; };
+})();
 window.showSrvUserMenu=showSrvUserMenu;
 window.srvAddReparatie=srvAddReparatie;
 window.srvOpenEdit=srvOpenEdit;
@@ -6616,7 +6791,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261022-143900';
+const APP_VERSION='20261022-150142';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
