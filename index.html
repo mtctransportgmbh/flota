@@ -1003,6 +1003,7 @@ body.user-mode .log-mobile-card {
       </select>
       <button class="btn-add-log" id="stoc-add-btn" onclick="stocOpenAdd()">+ Piesă nouă</button>
       <button class="filter-btn" onclick="stocLogOpen()" title="Istoric mișcări stoc">📜 Istoric stoc</button>
+      <button class="filter-btn" id="stoc-alert-btn" onclick="stocAlertOpen()" title="Alertă pe mail când stocul e scăzut" style="display:none">🔔 Alertă mail</button>
     </div>
     <div id="stoc-section"></div>
   </div>
@@ -1197,6 +1198,34 @@ body.user-mode .log-mobile-card {
     <div class="modal-actions">
       <button class="btn" onclick="srvCloseComplete()">Anulează</button>
       <button class="btn btn-primary" onclick="srvFinalizeTask()">Marchează finalizată</button>
+    </div>
+  </div>
+</div>
+
+<!-- Alertă stoc scăzut pe mail -->
+<div class="modal-overlay" id="srv-modal-stoc-alert" onclick="if(event.target===this)stocAlertClose()">
+  <div class="modal">
+    <div class="modal-title">🔔 Alertă stoc scăzut pe mail</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.5">În fiecare dimineață la 07:00 primești un mail cu piesele care au ajuns la pragul de mai jos sau sub el (câte o linie pe piesă, separat pe stocul lui Ioan / Vasile). Dacă nu e nimic sub prag, nu se trimite nimic.</div>
+    <div class="modal-field" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="sa-activ" style="width:18px;height:18px"> <b>Alerta este activă</b></label>
+    </div>
+    <div class="modal-field">
+      <div class="modal-label">Adresă mail (poți pune mai multe, separate prin virgulă)</div>
+      <input id="sa-email" type="text" inputmode="email" autocapitalize="off" placeholder="ex: nume@firma.de">
+    </div>
+    <div class="modal-label" style="margin-top:4px">Alertă când rămân cel mult…</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="modal-field"><div class="modal-label">Cauciucuri (buc)</div><input id="sa-cauciucuri" type="number" min="0" inputmode="numeric"></div>
+      <div class="modal-field"><div class="modal-label">Plăcuțe (categoria Frâne)</div><input id="sa-placute" type="number" min="0" inputmode="numeric"></div>
+      <div class="modal-field"><div class="modal-label">Filtre</div><input id="sa-filtre" type="number" min="0" inputmode="numeric"></div>
+      <div class="modal-field"><div class="modal-label">Alte piese</div><input id="sa-altele" type="number" min="0" inputmode="numeric"></div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin:2px 0 10px">Pragul se aplică fiecărei piese în parte (ex: fiecare mărime de cauciuc). „Alte piese" = Ulei, Curea, Bujii, Lichide, Altele.</div>
+    <div class="modal-actions">
+      <button class="btn" onclick="stocAlertClose()">Anulează</button>
+      <button class="btn" id="sa-test-btn" onclick="stocAlertTest()">Trimite test</button>
+      <button class="btn btn-primary" onclick="stocAlertSave()">Salvează</button>
     </div>
   </div>
 </div>
@@ -1634,6 +1663,7 @@ let stoc=[];
 let stocIdCtr=1;
 let stocLog=[];       // istoric mișcări stoc
 let stocLogIdCtr=1;
+let stocAlert=null;     // setări alertă mail stoc scăzut (salvate în documentul echipei)
 let backupuri=[];
 let backupIdCtr=1;
 let garantii=[];   // {id, masinaId, masinaNr, masinaTip, dataExpirare, serviceNume, interventii[], note, activa}
@@ -2363,6 +2393,7 @@ function hydrateFromCloud(d){
   stocIdCtr = d.stocIdCtr || 1;
   stocLog = (d.stocLog||[]).map(x=>({...x}));
   stocLogIdCtr = d.stocLogIdCtr || 1;
+  stocAlert = d.stocAlert ? JSON.parse(JSON.stringify(d.stocAlert)) : null;
   backupuri = (d.backupuri||[]).map(b=>({id:b.id,timestamp:b.timestamp,triggerBy:b.triggerBy,size:b.size||0}));
   backupIdCtr = d.backupIdCtr || 1;
   flotaBackupuri = (d.flotaBackupuri||[]).map(b=>({id:b.id,timestamp:b.timestamp,triggerBy:b.triggerBy,size:b.size||0,snapshot:b.snapshot||''}));
@@ -2737,6 +2768,7 @@ function saveToCloud(){
       stocIdCtr,
       stocLog,
       stocLogIdCtr,
+      ...(stocAlert?{stocAlert}:{}),
       backupuri: backupuri.map(b=>({id:b.id,timestamp:b.timestamp,triggerBy:b.triggerBy,size:b.size||0})),
       backupIdCtr,
       flotaBackupuri: flotaBackupuri.map(b=>({id:b.id,timestamp:b.timestamp,triggerBy:b.triggerBy,size:b.size||0,snapshot:b.snapshot||''})),
@@ -3999,9 +4031,43 @@ function stocToggleTireFields(){
 }
 window.stocToggleTireFields=stocToggleTireFields;
 
+const STOC_ALERT_DEF={activ:true,email:'',praguri:{cauciucuri:10,placute:10,filtre:5,altele:2}};
+function stocAlertCfg(){
+  const a=stocAlert||{};
+  return {activ:a.activ!==false, email:a.email||'', praguri:{...STOC_ALERT_DEF.praguri,...(a.praguri||{})}};
+}
+// prag de alertă pentru o piesă (după categorie)
+function stocPrag(s){
+  const p=stocAlertCfg().praguri;
+  const n=k=>{const v=Number(p[k]); return isFinite(v)&&v>=0?v:STOC_ALERT_DEF.praguri[k];};
+  return s.categorie==='Cauciucuri'?n('cauciucuri'):s.categorie==='Frâne'?n('placute'):s.categorie==='Filtre'?n('filtre'):n('altele');
+}
+// piesele existente dinainte de istoric primesc o intrare inițială (o singură dată)
+function stocLogBackfill(){
+  if(!canEditStoc()||!stoc.length) return;
+  const added=new Set(stocLog.filter(x=>x.tip==='adaugare').map(x=>x.stocId));
+  let changed=false;
+  stoc.forEach(st=>{
+    if(added.has(st.id)) return;
+    const mine=stocLog.filter(x=>x.stocId===st.id).sort((a,b)=>a.id-b.id);
+    const first=mine[0];
+    const init=first?((first.dupa==null?0:first.dupa)-(first.delta||0)):(st.cantitate||0);
+    if(first && !(init>0)) return;
+    const snap={...st,cantitate:init};
+    stocLogAdd('adaugare', snap, init, 'stoc existent înainte de pornirea istoricului');
+    const e=stocLog[stocLog.length-1];
+    let ts=st.addedAt||e.ts; if(first && first.ts<ts) ts=first.ts;
+    e.ts=ts; e.by='Sistem'; e.byUsername='';
+    changed=true;
+  });
+  if(changed) saveToCloud();
+}
 function renderStoc(){
   const sec = document.getElementById('stoc-section');
   if(!sec) return;
+  try{ stocLogBackfill(); }catch(e){ console.warn('backfill stoc', e); }
+  const alertBtn=document.getElementById('stoc-alert-btn');
+  if(alertBtn) alertBtn.style.display=(canEditStoc()&&(isAdminUser||isSrvSef()))?'':'none';
   const addBtn = document.getElementById('stoc-add-btn');
   document.body.classList.toggle('stoc-editor', canEditStoc());
   if(addBtn) addBtn.style.display = canEditStoc() ? '' : 'none';
@@ -4029,7 +4095,7 @@ function renderStoc(){
   }
   sec.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">'+
     list.map(s=>{
-      const cantColor=s.cantitate===0?'var(--danger)':s.cantitate<=2?'var(--t6)':'var(--accent)';
+      const cantColor=s.cantitate===0?'var(--danger)':s.cantitate<=stocPrag(s)?'var(--t6)':'var(--accent)';
       const tipColor = s.compatibil==='CRAFTER'?'var(--crafter)':s.compatibil==='T6'?'var(--t6)':'#888';
       const tipLabel = s.compatibil||'Universal';
       const editBtn=canEditStoc()?`<button class="icon-btn" onclick="stocOpenEdit(${s.id})">✎</button>`:'';
@@ -4054,7 +4120,7 @@ function renderStoc(){
           <div style="font-family:var(--mono);font-size:20px;font-weight:500;color:${cantColor}">${s.cantitate} <span style="font-size:12px;color:var(--text3)">${s.comun?'tuburi':'buc'}</span></div>
           ${s.pret?`<div style="font-family:var(--mono);font-size:13px;color:var(--text2)" class="srv-cost-display">${Number(s.pret).toFixed(2)} €/${s.comun?'tub':'buc'}</div>`:''}
         </div>
-        ${s.cantitate===0?'<div style="font-size:11px;color:var(--danger);margin-top:6px">⚠ Stoc epuizat</div>':s.cantitate<=2?'<div style="font-size:11px;color:var(--t6);margin-top:6px">⚠ Stoc scăzut</div>':''}
+        ${s.cantitate===0?'<div style="font-size:11px;color:var(--danger);margin-top:6px">⚠ Stoc epuizat</div>':s.cantitate<=stocPrag(s)?'<div style="font-size:11px;color:var(--t6);margin-top:6px">⚠ Stoc scăzut (alertă la ≤ '+stocPrag(s)+')</div>':''}
       </div>`;
     }).join('')+'</div>';
 }
@@ -4169,7 +4235,7 @@ function stocLogRows(){
   const q=(document.getElementById('stoc-log-search')?.value||'').toLowerCase();
   const mine=isSrvMecanic()&&['ion-srv','vasile-srv'].includes(currentUser?.username);
   const tipF=document.getElementById('stoc-log-tip')?.value||'';
-  return stocLog.slice().reverse().filter(x=>{
+  return stocLog.slice().sort((a,b)=>a.ts<b.ts?1:a.ts>b.ts?-1:(b.id-a.id)).filter(x=>{
     if(mine && x.owner && x.owner!==currentUser.username) return false;
     if(!mine && stocLogOwner!=='all' && x.owner!==stocLogOwner) return false;
     if(tipF && x.tip!==tipF) return false;
@@ -4218,6 +4284,54 @@ function stocLogExportCsv(){
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='istoric-stoc.csv'; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
 }
 window.stocLogOpen=stocLogOpen; window.stocLogClose=stocLogClose; window.stocLogSetOwner=stocLogSetOwner; window.stocLogRender=stocLogRender; window.stocLogExportCsv=stocLogExportCsv;
+
+// ── ALERTĂ STOC SCĂZUT PE MAIL ───────────────────────────────────────
+function stocAlertOpen(){
+  if(!(canEditStoc()&&(isAdminUser||isSrvSef()))){toast('Doar șefii pot seta alerta');return;}
+  const c=stocAlertCfg();
+  document.getElementById('sa-activ').checked=c.activ;
+  document.getElementById('sa-email').value=c.email;
+  ['cauciucuri','placute','filtre','altele'].forEach(k=>document.getElementById('sa-'+k).value=c.praguri[k]);
+  document.getElementById('srv-modal-stoc-alert').classList.add('open');
+}
+function stocAlertClose(){ document.getElementById('srv-modal-stoc-alert').classList.remove('open'); }
+function stocAlertRead(){
+  const email=document.getElementById('sa-email').value.trim();
+  const list=email.split(/[,;\s]+/).filter(Boolean);
+  const bad=list.find(x=>!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
+  if(bad){toast('Adresă invalidă: '+bad);return null;}
+  const praguri={};
+  for(const k of ['cauciucuri','placute','filtre','altele']){
+    const v=parseInt(document.getElementById('sa-'+k).value);
+    praguri[k]=isFinite(v)&&v>=0?v:STOC_ALERT_DEF.praguri[k];
+  }
+  return {activ:document.getElementById('sa-activ').checked, email:list.join(', '), praguri};
+}
+function stocAlertSave(){
+  const v=stocAlertRead(); if(!v) return;
+  if(v.activ&&!v.email){toast('Scrie adresa de mail unde trimit alerta');return;}
+  stocAlert={...(stocAlert||{}),...v};
+  saveToCloud(); stocAlertClose(); renderStoc();
+  toast(v.activ?'Alertă salvată — mail zilnic la 07:00':'Alertă salvată (oprită)');
+}
+async function stocAlertTest(){
+  const v=stocAlertRead(); if(!v) return;
+  if(!v.email){toast('Scrie întâi adresa de mail');return;}
+  const btn=document.getElementById('sa-test-btn'); btn.disabled=true; const old=btn.textContent; btn.textContent='Trimit…';
+  try{
+    const user=window.fbAuth.currentUser; if(!user) throw new Error('nu ești autentificat');
+    const tok=await user.getIdToken();
+    const pid=window.fbAuth.app.options.projectId;
+    const r=await fetch('https://europe-west1-'+pid+'.cloudfunctions.net/stocAlertTest',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({email:v.email,praguri:v.praguri})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok||!j.ok) throw new Error(j.error||('eroare '+r.status));
+    toast('Mail de test trimis la '+v.email+' ('+j.low+' piese sub prag acum)');
+  }catch(e){
+    console.error('stocAlertTest',e);
+    toast('Test eșuat: '+(e.message||e)+' — vezi dacă funcția e urcată');
+  }finally{ btn.disabled=false; btn.textContent=old; }
+}
+window.stocAlertOpen=stocAlertOpen; window.stocAlertClose=stocAlertClose; window.stocAlertSave=stocAlertSave; window.stocAlertTest=stocAlertTest;
 
 function stocDelete(){
   if(!isAdminUser||!editingStocId)return;
@@ -5811,7 +5925,7 @@ window.srvOpenStat=srvOpenStat; window.srvCloseStat=srvCloseStat;
     'srv-modal-istoric-masina':()=>srvmClose(), 'modal-printcheck':()=>closePrintCheck(),
     'modal-driver':()=>closeModalDriver(), 'modal-log':()=>closeModalLog(), 'modal-addlog':()=>closeModalAddLog(),
     'modal-edit':()=>closeModalEdit(), 'srv-modal-task':()=>srvCloseTaskModal(), 'srv-modal-complete':()=>srvCloseComplete(),
-    'srv-modal-stoc':()=>stocCloseModal(), 'srv-modal-edit':()=>srvCloseEdit(), 'srv-modal-stat':()=>srvCloseStat(), 'srv-modal-stoc-log':()=>stocLogClose()
+    'srv-modal-stoc':()=>stocCloseModal(), 'srv-modal-edit':()=>srvCloseEdit(), 'srv-modal-stat':()=>srvCloseStat(), 'srv-modal-stoc-log':()=>stocLogClose(), 'srv-modal-stoc-alert':()=>stocAlertClose()
   };
   const standalone = (window.matchMedia&&matchMedia('(display-mode: standalone)').matches) || navigator.standalone===true;
   const openList=()=>[...document.querySelectorAll('.modal-overlay.open')];
@@ -6502,7 +6616,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261022-122424';
+const APP_VERSION='20261022-143900';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
