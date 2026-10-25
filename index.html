@@ -2341,7 +2341,7 @@ function hydrateFromCloud(d){
     // Format nou — folosesc ce vine din cloud, dar mă asigur că au structura corectă
     soferi = rawSoferi.map(s=>{
       if(typeof s === 'string') return {name:s, location:''};
-      return {name:s.name||'', location:s.location||''};
+      return {...s, name:s.name||'', location:s.location||''}; // păstrează câmpurile adăugate de sincronizare (angajatId, coord)
     });
   }
 
