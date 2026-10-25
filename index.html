@@ -502,16 +502,16 @@ body.user-mode .log-mobile-card {
     <div class="login-logo">MTC TRANSPORT</div>
     <div class="login-title">Setează PIN personal</div>
     <div style="font-size:13px;color:var(--text2);margin-bottom:20px;text-align:center;line-height:1.5">
-      Prima conectare — alege un PIN din 6 cifre.<br>Îl vei folosi la viitoarele conectări.
+      Ai primit un PIN provizoriu — alege un PIN personal de 6-8 cifre (fără șiruri ca 123456 sau 111111).<br>Îl vei folosi la viitoarele conectări.
     </div>
     <div id="pin-setup-error" class="login-error" style="display:none"></div>
     <div class="login-field">
-      <div class="login-label">PIN nou (6 cifre)</div>
-      <input id="pin-setup-1" type="password" inputmode="numeric" maxlength="6" class="login-input" placeholder="••••••" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+      <div class="login-label">PIN nou (6-8 cifre)</div>
+      <input id="pin-setup-1" type="password" inputmode="numeric" maxlength="8" class="login-input" placeholder="••••••" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
     </div>
     <div class="login-field">
       <div class="login-label">Confirmă PIN</div>
-      <input id="pin-setup-2" type="password" inputmode="numeric" maxlength="6" class="login-input" placeholder="••••••" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+      <input id="pin-setup-2" type="password" inputmode="numeric" maxlength="8" class="login-input" placeholder="••••••" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
     </div>
     <button class="login-btn" onclick="pinSetupConfirm()">Salvează PIN</button>
     <div style="text-align:center;margin-top:14px;font-size:13px">
@@ -525,10 +525,10 @@ body.user-mode .log-mobile-card {
   <div class="login-box">
     <div class="login-logo">MTC TRANSPORT</div>
     <div class="login-title" id="pin-login-title">Bun venit</div>
-    <div style="font-size:13px;color:var(--text2);margin-bottom:20px;text-align:center">Introdu PIN-ul tău de 6 cifre</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:20px;text-align:center">Introdu PIN-ul tău</div>
     <div id="pin-login-error" class="login-error" style="display:none"></div>
     <div class="login-field">
-      <input id="pin-login-input" type="password" inputmode="numeric" maxlength="6" class="login-input" placeholder="••••••" oninput="this.value=this.value.replace(/[^0-9]/g,'')" onkeydown="if(event.key==='Enter') pinLoginConfirm()">
+      <input id="pin-login-input" type="password" inputmode="numeric" maxlength="8" class="login-input" placeholder="••••••" oninput="this.value=this.value.replace(/[^0-9]/g,'')" onkeydown="if(event.key==='Enter') pinLoginConfirm()">
     </div>
     <button class="login-btn" onclick="pinLoginConfirm()">Intră</button>
     <div style="text-align:center;margin-top:14px;font-size:13px;display:flex;flex-direction:column;gap:8px">
@@ -1610,10 +1610,12 @@ body.user-mode .log-mobile-card {
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, setPersistence, browserLocalPersistence }
+import { getAuth, signInWithCustomToken, signOut, onAuthStateChanged, updateProfile, setPersistence, browserLocalPersistence }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, onSnapshot, runTransaction, enableIndexedDbPersistence }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFunctions, httpsCallable }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 import { getMessaging, getToken, onMessage }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 
@@ -1648,8 +1650,7 @@ if (!firebaseConfig || !firebaseConfig.apiKey) {
   window.fbAuth = auth;
   window.fbDocRef = docRef;
   window.fbHelpers = {
-    signIn: signInWithEmailAndPassword,
-    signUp: createUserWithEmailAndPassword,
+    signInCustom: signInWithCustomToken,
     signOut,
     onAuth: onAuthStateChanged,
     updateProfile,
@@ -1661,6 +1662,9 @@ if (!firebaseConfig || !firebaseConfig.apiKey) {
     onSnapshot
   };
   window.fbDb = db;
+  // Apel către funcțiile din Cloud Functions (autentificarea se face pe server)
+  const _fns = getFunctions(app, "europe-west1");
+  window.fbCall = (name, data) => httpsCallable(_fns, name)(data).then(r => r.data);
 
   // Inițializare Messaging pentru notificări push
   try {
@@ -1892,8 +1896,6 @@ function toast(msg){
 
 // ── AUTH ─────────────────────────────────────────────────────────────
 const FAKE_DOMAIN = '@flota.local';
-// Parola fixă pentru cei 3 useri prestabiliți (nu o știu, e folosită automat)
-const QUICK_USER_PASSWORD = 'mtc-flota-2026-quickuser';
 
 // Returnează lista de useri prestabiliți pentru modul-ul curent
 function getQuickUsersForMode(mode){
@@ -2000,108 +2002,72 @@ async function afterQuickAuth(username, displayName){
   }
 }
 
-function pinSetupConfirm(){
+// Autentificare pe server: PIN-ul se verifică în Cloud Functions, nu în browser
+async function flotaSignIn(username, credential){
+  const r = await window.fbCall('flotaLogin', { username: (username||'').trim().toLowerCase(), credential });
+  window._flotaMustChange = !!r.mustChange;
+  await window.fbHelpers.signInCustom(window.fbAuth, r.token);
+}
+function flotaErrMsg(e){
+  const code = e && e.code || '';
+  if(code.includes('resource-exhausted')) return e.message || 'Prea multe încercări. Așteaptă câteva minute.';
+  if(code.includes('permission-denied')) return 'Utilizator sau PIN incorect.';
+  if(code.includes('unavailable') || code.includes('network')) return 'Fără conexiune la internet';
+  return (e && e.message) || 'Nu m-am putut conecta';
+}
+
+async function pinSetupConfirm(){
   const p1 = document.getElementById('pin-setup-1').value.trim();
   const p2 = document.getElementById('pin-setup-2').value.trim();
   const errEl = document.getElementById('pin-setup-error');
   errEl.style.display='none';
-  if(p1.length !== 6){ errEl.textContent='PIN-ul trebuie să aibă exact 6 cifre'; errEl.style.display=''; return; }
-  if(!/^\d{6}$/.test(p1)){ errEl.textContent='PIN-ul trebuie să conțină doar cifre'; errEl.style.display=''; return; }
+  if(!/^\d{6,8}$/.test(p1)){ errEl.textContent='PIN-ul trebuie să aibă 6-8 cifre'; errEl.style.display=''; return; }
   if(p1 !== p2){ errEl.textContent='PIN-urile nu coincid'; errEl.style.display=''; return; }
-  // Salvăm PIN în knownUsers — și sincronizăm toate intrările cu același name (cross-app)
-  const uname = _pinPendingUser?.username;
-  const uDisplayName = _pinPendingUser?.displayName;
-  let found = false;
-  knownUsers.forEach(u => {
-    if(u.username === uname){
-      u.pin = p1; found = true;
-    } else if(uDisplayName && u.name && u.name.toLowerCase() === uDisplayName.toLowerCase()){
-      // Același user din cealaltă aplicație — sincronizăm PIN-ul
-      u.pin = p1;
-    }
-  });
-  if(!found && _pinPendingUser){
-    knownUsers.push({username: uname, name: uDisplayName, pin: p1, firstSeen: new Date().toISOString(), lastSeen: new Date().toISOString()});
+  try{
+    await window.fbCall('flotaChangePin', { newCredential: p1 });
+  }catch(e){
+    errEl.textContent = (e && e.message) || 'Nu am putut salva PIN-ul'; errEl.style.display=''; return;
   }
-  saveToCloud();
+  window._flotaMustChange = false;
   pinScreensHide();
-  // Continuăm cu app-ul — onAuthStateChanged deja a rulat, deci app-ul e gata
   toast('✓ PIN setat cu succes');
 }
 
-function pinLoginConfirm(){
+async function pinLoginConfirm(){
   const pin = document.getElementById('pin-login-input').value.trim();
   const errEl = document.getElementById('pin-login-error');
   errEl.style.display='none';
   const uname = _pinPendingUser?.username;
-  const uDisplay = _pinPendingUser?.displayName;
-  // Căutăm PIN după username SAU după name (cross-app sync)
-  const ku = knownUsers.find(u=>u.username===uname && u.pin)
-    || knownUsers.find(u=>u.name && uDisplay && u.name.toLowerCase()===uDisplay.toLowerCase() && u.pin);
-  if(!ku?.pin){
-    // Nu are PIN setat deloc — trece direct (nu mai cerem setup din nou)
-    if(uname) _setPinConfirmed(uname);
-    pinScreensHide();
-    return;
-  }
-  if(pin !== ku.pin){
-    errEl.textContent='PIN greșit. Încearcă din nou.';
+  if(!uname || !pin){ return; }
+  const btn = document.querySelector('#pin-login-screen .login-btn');
+  if(btn) btn.disabled = true;
+  try{
+    await flotaSignIn(uname, pin);
+    document.getElementById('pin-login-screen').style.display='none';
+    // onAuthStateChanged continuă: deschide aplicația sau cere un PIN nou dacă e provizoriu
+  }catch(e){
+    errEl.textContent = flotaErrMsg(e);
     errEl.style.display='';
     document.getElementById('pin-login-input').value='';
     document.getElementById('pin-login-input').focus();
-    return;
   }
-  // PIN corect
-  ku.lastSeen = new Date().toISOString();
-  if(uname) _setPinConfirmed(uname); // marchează explicit înainte de pinScreensHide
-  saveToCloud();
-  pinScreensHide();
-  toast('✓ Autentificat');
+  if(btn) btn.disabled = false;
 }
 
 function pinLoginReset(){
   alert('Contactează adminul pentru resetarea PIN-ului.');
 }
 
-async function quickLogin(username, displayName){
-  const errEl=document.getElementById('login-error');
-  errEl.style.display='none';
-  const email = username + FAKE_DOMAIN;
-  const buttons=document.querySelectorAll('.quick-user-btn');
-  buttons.forEach(b=>b.disabled=true);
-  try{
-    try{
-      // Încearcă login direct
-      await window.fbHelpers.signIn(window.fbAuth, email, QUICK_USER_PASSWORD);
-    } catch(e){
-      // Userul probabil nu există încă — îl creăm
-      if(e.code==='auth/invalid-credential' || e.code==='auth/user-not-found' || e.code==='auth/wrong-password'){
-        try{
-          const cred = await window.fbHelpers.signUp(window.fbAuth, email, QUICK_USER_PASSWORD);
-          await window.fbHelpers.updateProfile(cred.user, { displayName });
-        } catch(signUpErr){
-          // Contul există deja dar cu altă parolă — nu putem face nimic din client
-          // (parola e setată de admin) — arătăm eroare clară
-          if(signUpErr.code==='auth/email-already-in-use'){
-            // Contul există dar cu altă parolă — încearcă cu parola default veche dacă există
-            throw new Error('Eroare conectare: contul există cu altă parolă. Admin: resetează parola în Firebase Console pentru ' + email + ' la: ' + QUICK_USER_PASSWORD);
-          }
-          throw signUpErr;
-        }
-      } else {
-        throw e;
-      }
-    }
-    // Firebase login reușit — onAuthStateChanged se declanșează automat și gestionează PIN
-  } catch(e){
-    let msg = 'Nu m-am putut conecta';
-    if(e.code==='auth/network-request-failed') msg='Fără conexiune la internet';
-    else if(e.code==='auth/too-many-requests') msg='Prea multe încercări. Așteaptă câteva minute.';
-    else msg = e.message || msg;
-    errEl.textContent = msg;
-    errEl.style.display='';
-    buttons.forEach(b=>b.disabled=false);
-  }
+// Login cu utilizator prestabilit: cere PIN-ul, verificat pe server
+function quickLogin(username, displayName){
+  document.getElementById('login-error').style.display='none';
+  _pinPendingUser = {username, displayName};
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('pin-login-screen').style.display='';
+  document.getElementById('pin-login-title').textContent = 'Bun venit, ' + displayName;
+  document.getElementById('pin-login-input').value='';
+  document.getElementById('pin-login-error').style.display='none';
+  setTimeout(()=>document.getElementById('pin-login-input')?.focus(), 100);
 }
 
 async function doAuth(){
@@ -2109,22 +2075,13 @@ async function doAuth(){
   const pass=document.getElementById('login-password').value;
   const errEl=document.getElementById('login-error');
   errEl.style.display='none';
-  if(!input || !pass){ errEl.textContent='Completează email și parolă'; errEl.style.display=''; return; }
-
+  if(!input || !pass){ errEl.textContent='Completează utilizatorul și parola'; errEl.style.display=''; return; }
   const btn=document.getElementById('login-btn');
   btn.disabled=true; btn.textContent='...';
-
   try{
-    const email = toFirebaseEmail(input);
-    await window.fbHelpers.signIn(window.fbAuth, email, pass);
+    await flotaSignIn(input, pass);
   } catch(e){
-    let msg='Email/username sau parolă greșită';
-    if(e.code==='auth/invalid-credential' || e.code==='auth/wrong-password' || e.code==='auth/user-not-found') msg='Email/username sau parolă greșită';
-    else if(e.code==='auth/invalid-email') msg='Format invalid';
-    else if(e.code==='auth/network-request-failed') msg='Fără conexiune la internet';
-    else if(e.code==='auth/too-many-requests') msg='Prea multe încercări. Așteaptă câteva minute.';
-    else msg=e.message||msg;
-    errEl.textContent=msg; errEl.style.display='';
+    errEl.textContent=flotaErrMsg(e); errEl.style.display='';
   }
   btn.disabled=false;
   btn.textContent='Intră ca admin';
@@ -2201,20 +2158,28 @@ function _showApp(){
     document.getElementById('user-avatar').style.color=avc(currentUser.name);
     try{
       const user = window.fbAuth.currentUser;
-      document.getElementById('info-email').textContent=currentUser.username + (user&&user.email.includes(FAKE_DOMAIN)?'':' ('+(user?.email||'')+')');
+      document.getElementById('info-email').textContent=currentUser.username;
     }catch(e){}
   }
   startSync();
 }
 
 window.addEventListener('firebase-ready', ()=>{
-  window.fbHelpers.onAuth(window.fbAuth, (user)=>{
+  window.fbHelpers.onAuth(window.fbAuth, async (user)=>{
     if(user){
       window._sessionStart = new Date();
-      const username = fromFirebaseEmail(user.email);
+      // utilizatorul vine din token (emis de server după verificarea PIN-ului)
+      let _claims = {};
+      try{ _claims = (await user.getIdTokenResult()).claims || {}; }catch(e){}
+      if(_claims.flota !== true || !_claims.username){
+        // sesiune veche (cont email/parolă) sau fără drepturi: ieșim și cerem login cu PIN
+        try{ await window.fbHelpers.signOut(window.fbAuth); }catch(e){}
+        return;
+      }
+      const username = _claims.username;
       currentUser={
         uid:user.uid,
-        email:user.email,
+        email:'',
         username:username,
         name:((QUICK_USERS_FLOTA.concat(QUICK_USERS_SERVICE)).find(q=>q.username===username)||{}).name||user.displayName||username
       };
@@ -2235,48 +2200,15 @@ window.addEventListener('firebase-ready', ()=>{
       document.getElementById('login-screen').style.display='none';
       document.getElementById('mode-select').style.display='none';
 
-      // Dacă e quick user (nu admin) și PIN-ul nu a fost confirmat încă în această sesiune,
-      // blocăm afișarea app-ului — afterQuickAuth va afișa ecranul PIN
-      const isQuickUser = QUICK_USERS_FLOTA.find(u=>u.username===username) || QUICK_USERS_SERVICE.find(u=>u.username===username);
-      // Dacă e quick user și nu a confirmat PIN în sesiunea curentă — cerem PIN
-      if(isQuickUser && !_isPinConfirmed(username)){
-        // Trebuie să avem knownUsers încărcat înainte de a verifica PIN-ul
-        // Facem un fetch rapid din Firestore înainte de a arăta ecranul PIN
-        let pinCheckKu = knownUsers.find(u=>u.username===username)
-          || knownUsers.find(u=>u.name && currentUser.name && u.name.toLowerCase()===currentUser.name.toLowerCase() && u.pin);
-
-        const doPinCheck = (ku) => {
-          if(ku?.pin){
-            document.getElementById('pin-login-screen').style.display='';
-            document.getElementById('pin-login-title').textContent = 'Bun venit, ' + currentUser.name;
-            document.getElementById('pin-login-input').value='';
-            document.getElementById('pin-login-error').style.display='none';
-            _pinPendingUser = {username, displayName: currentUser.name};
-            setTimeout(()=>document.getElementById('pin-login-input')?.focus(), 100);
-          } else {
-            document.getElementById('pin-setup-screen').style.display='';
-            _pinPendingUser = {username, displayName: currentUser.name};
-            setTimeout(()=>document.getElementById('pin-setup-1')?.focus(), 100);
-          }
-        };
-
-        if(pinCheckKu !== undefined || knownUsers.length > 0){
-          // knownUsers deja încărcat
-          doPinCheck(pinCheckKu);
-        } else {
-          // knownUsers nu e încă disponibil — citim direct din Firestore o singură dată
-          document.getElementById('loading').style.display='';
-          window.fbHelpers.getDoc(window.fbDocRef).then(snap=>{
-            document.getElementById('loading').style.display='none';
-            if(snap.exists()){
-              const d = snap.data();
-              hydrateFromCloud(d);
-            }
-            const ku2 = knownUsers.find(u=>u.username===username)
-              || knownUsers.find(u=>u.name && currentUser.name && u.name.toLowerCase()===currentUser.name.toLowerCase() && u.pin);
-            doPinCheck(ku2);
-          }).catch(()=>{ doPinCheck(null); });
-        }
+      document.getElementById('pin-login-screen').style.display='none';
+      // PIN provizoriu (resetat de admin): cerem imediat un PIN personal, înainte de aplicație
+      if(window._flotaMustChange === true){
+        document.getElementById('pin-setup-screen').style.display='';
+        document.getElementById('pin-setup-1').value='';
+        document.getElementById('pin-setup-2').value='';
+        document.getElementById('pin-setup-error').style.display='none';
+        _pinPendingUser = {username, displayName: currentUser.name};
+        setTimeout(()=>document.getElementById('pin-setup-1')?.focus(), 100);
         return;
       }
 
@@ -3697,7 +3629,8 @@ function renderAdminUsers(){
       const c=avc(u.name);
       const isAdmin = admins.includes(u.username);
       const isMe = currentUser && u.username===currentUser.username;
-      const pinBadge = u.pin
+      const pinBadge = `<span style="font-size:11px;color:var(--text3)">🔒 verificat pe server</span>`;
+      const _unusedPinBadge = u.pin
         ? `<span style="font-family:var(--mono);font-size:13px;background:var(--surface);border:1px solid var(--border2);border-radius:3px;padding:2px 8px;color:var(--text2);letter-spacing:.1em">${u.pin}</span>`
         : `<span style="font-size:11px;color:var(--text3);font-style:italic">fără PIN</span>`;
       return `<div style="display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;flex-wrap:wrap">
@@ -3716,17 +3649,15 @@ function renderAdminUsers(){
     }).join('')+'</div>';
 }
 
-function adminResetPin(username, name){
-  if(!confirm(`Resetezi PIN-ul pentru ${name}?\nLa următoarea conectare va fi nevoit să seteze un PIN nou.\n(Se resetează și în cealaltă aplicație dacă are același nume.)`)) return;
-  // Resetează PIN pentru toate intrările cu același username SAU același name
-  knownUsers.forEach(u => {
-    if(u.username === username || (name && u.name && u.name.toLowerCase() === name.toLowerCase())){
-      u.pin = null; delete u.pin;
-    }
-  });
-  saveToCloud();
-  renderAdminUsers();
-  toast(`PIN resetat pentru ${name}`);
+async function adminResetPin(username, name){
+  if(!confirm(`Resetezi PIN-ul pentru ${name}?\nPrimește un PIN provizoriu, pe care îl schimbă la prima conectare.\n(Se resetează și în cealaltă aplicație dacă are același nume.)`)) return;
+  try{
+    const r = await window.fbCall('flotaAdminResetPin', { username });
+    alert(`PIN provizoriu pentru ${name}:\n\n${r.pin}\n\nNotează-l acum și dă-l persoanei. Nu îl mai poți vedea după ce închizi mesajul.`);
+    toast(`PIN resetat pentru ${name}`);
+  }catch(e){
+    alert('Nu am putut reseta PIN-ul: ' + ((e && e.message) || e));
+  }
 }
 
 function adminDeleteUser(username){
