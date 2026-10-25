@@ -254,6 +254,19 @@ body.srv-sef #srv-add-task-btn,
 body.srv-mecanic #srv-add-task-btn {
   display: flex !important;
 }
+/* Telefon: butonul „+ Sarcină nouă" devine un plus rotund plutitor, jos în dreapta */
+@media (max-width:640px){
+  #srv-add-task-btn{
+    position:fixed !important; right:max(18px, env(safe-area-inset-right, 0px)); bottom:calc(22px + env(safe-area-inset-bottom, 0px));
+    width:60px; height:60px; min-height:60px; padding:0 !important; border-radius:50%;
+    background:var(--accent) !important; color:#fff !important; border:none !important;
+    font-size:0 !important; line-height:0; align-items:center; justify-content:center;
+    box-shadow:0 6px 18px rgba(0,0,0,.28); z-index:90;
+  }
+  #srv-add-task-btn::before{ content:"+"; font-size:38px; line-height:1; font-weight:300; margin-top:-3px; }
+  #srv-add-task-btn:active{ transform:scale(.94); background:var(--accent2) !important; }
+  #srv-tab-taskuri{ padding-bottom:96px; }
+}
 body.user-mode .log-mobile-card {
   cursor: default;
 }
@@ -923,7 +936,7 @@ body.user-mode .log-mobile-card {
       <button class="filter-btn" data-task-filter="vasile-srv" onclick="setTaskFilter('vasile-srv')">Vasile</button>
       <button class="filter-btn" data-task-filter="done" onclick="setTaskFilter('done')">Finalizate</button>
       <div style="flex:1"></div>
-      <button class="btn-add-log" id="srv-add-task-btn" onclick="srvOpenAddTask()">+ Sarcină nouă</button>
+      <button class="btn-add-log" id="srv-add-task-btn" onclick="srvOpenAddTask()" aria-label="Sarcină nouă" title="Sarcină nouă">+ Sarcină nouă</button>
     </div>
     <div id="srv-taskuri-section"></div>
     <div id="srv-active-section" style="margin-top:22px"></div>
@@ -6825,7 +6838,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261023-155936';
+const APP_VERSION='20261025-095050';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
