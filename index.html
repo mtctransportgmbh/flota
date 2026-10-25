@@ -250,7 +250,8 @@ body.eis-mode #modal-edit .btn-danger{display:none !important;}
 body.stoc-editor #stoc-add-btn{display:inline-block !important;}
 body.stoc-editor #stoc-section .icon-btn{display:inline-block !important;}
 /* Excepție: șefii Service văd butonul de sarcini noi */
-body.srv-sef #srv-add-task-btn {
+body.srv-sef #srv-add-task-btn,
+body.srv-mecanic #srv-add-task-btn {
   display: flex !important;
 }
 body.user-mode .log-mobile-card {
@@ -715,7 +716,7 @@ body.user-mode .log-mobile-card {
   <!-- ── TAB STRICATE ─────────────────────────────────────── -->
   <div id="tab-stricate" style="display:none">
     <div style="background:rgba(255,90,90,.06);border:1px solid rgba(255,90,90,.22);border-radius:var(--radius);padding:14px 18px;margin-bottom:16px;font-size:13px;color:var(--text2);line-height:1.6">
-      <strong style="color:var(--danger)">🔧 Mașini stricate</strong> — lista mașinilor marcate ca STRICATĂ. Schimbă din dropdown când mașina e reparată.
+      <strong style="color:var(--danger)">🔧 Mașini stricate</strong> — lista mașinilor marcate ca STRICATĂ, cu starea reparației din Service. Când reparația e gata, mașina se trece mai departe din card.
     </div>
     <div id="stricate-section"></div>
   </div>
@@ -902,11 +903,10 @@ body.user-mode .log-mobile-card {
 </div>
 
 <div class="tabs-bar">
-  <button class="tab-btn active" onclick="showSrvTab('active')">Reparații active</button>
-  <button class="tab-btn" onclick="showSrvTab('taskuri')">📋 Sarcini</button>
-  <button class="tab-btn" onclick="showSrvTab('istoric')">Istoric</button>
+  <button class="tab-btn active" onclick="showSrvTab('taskuri')">📋 Sarcini</button>
   <button class="tab-btn" onclick="showSrvTab('adauga')">+ Adaugă</button>
   <button class="tab-btn" onclick="showSrvTab('masini')">Mașini</button>
+  <button class="tab-btn" onclick="showSrvTab('istoric')">Istoric</button>
   <button class="tab-btn" onclick="showSrvTab('stoc')">🔩 Stoc</button>
   <button class="tab-btn" onclick="showSrvTab('garantie')">🛡 Garanție</button>
   <button class="tab-btn" id="srv-tab-btn-backup" onclick="showSrvTab('backup')" style="display:none">💾 Backup</button>
@@ -914,13 +914,8 @@ body.user-mode .log-mobile-card {
 </div>
 
 <div class="main">
-  <!-- Tab Reparații active -->
-  <div id="srv-tab-active">
-    <div id="srv-active-section"></div>
-  </div>
-
   <!-- Tab Sarcini (To-Do) -->
-  <div id="srv-tab-taskuri" style="display:none">
+  <div id="srv-tab-taskuri">
     <div id="srv-taskuri-toolbar" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
       <button class="filter-btn active" data-task-filter="me" onclick="setTaskFilter('me')">Sarcinile mele</button>
       <button class="filter-btn" data-task-filter="all" onclick="setTaskFilter('all')">Toate</button>
@@ -931,6 +926,7 @@ body.user-mode .log-mobile-card {
       <button class="btn-add-log" id="srv-add-task-btn" onclick="srvOpenAddTask()">+ Sarcină nouă</button>
     </div>
     <div id="srv-taskuri-section"></div>
+    <div id="srv-active-section" style="margin-top:22px"></div>
   </div>
 
   <!-- Tab Istoric -->
@@ -1165,6 +1161,7 @@ body.user-mode .log-mobile-card {
     <div class="modal-field">
       <div class="modal-label">Termen (când trebuie făcută)</div>
       <input id="srv-task-deadline" type="date">
+      <div style="font-size:11px;color:var(--text3);margin-top:5px">🔔 În dimineața termenului (07:00) cel care se ocupă primește notificare pe telefon.</div>
     </div>
     <div class="modal-field">
       <div class="modal-label">Ce trebuie făcut</div>
@@ -2522,7 +2519,7 @@ function updateAdminUI(){
   const _eis=isEiselfingUser();
   document.querySelectorAll('.tabs-bar .tab-btn').forEach(b=>{
     const oc=b.getAttribute('onclick')||'';
-    if(_eis) b.style.display = (oc.includes("'masini'")||oc.includes("'soferi'")||oc.includes("'disponibil'")||oc.includes("'log'")||oc.includes("'amenda'")) ? '' : 'none';
+    if(_eis) b.style.display = (oc.includes("'masini'")||oc.includes("'soferi'")||oc.includes("'disponibil'")||oc.includes("'log'")||oc.includes("'amenda'")||oc.includes("'stricate'")) ? '' : 'none';
     else if(!b.id && b.textContent.trim()!=='Setări') b.style.display='';
   });
   document.querySelectorAll('#toolbar-masini .filter-btn').forEach(b=>{
@@ -3055,6 +3052,7 @@ function closeModalDriver(){
 function confirmDriver(){
   if(!pendingDriverChange)return;
   const {carId, newDriver} = pendingDriverChange;
+  const _oldDriver = pendingDriverChange.oldDriver;
   const dt = new Date(document.getElementById('md-dt').value);
   const m = masini.find(x=>x.id===carId);
   if(!m) return;
@@ -3087,14 +3085,15 @@ function confirmDriver(){
     });
   }
 
+  if(newDriver==='STRICATA'){ const _pl=(sk(m.sofer)==='STRICATA')?m.strOrigin:(pcLocationOf(m)||''); if(_pl) m.strOrigin=_pl; else delete m.strOrigin; } else delete m.strOrigin;
   m.sofer = newDriver;
   if(newDriver==='DHL' && isEiselfingUser()) m.dhlOrigin='Eiselfing'; else delete m.dhlOrigin;
   closeModalDriver();
   saveToCloud();
   renderAll();
   // Backup automat la schimbare șofer
-  backupAuto(`Schimbat șofer ${m.nr}: ${pendingDriverChange.oldDriver||'—'} → ${newDriver} de ${currentUser?.name}`);
-  flotaBackupAuto(`Schimbat șofer ${m.nr}: ${pendingDriverChange.oldDriver||'—'} → ${newDriver} de ${currentUser?.name}`);
+  backupAuto(`Schimbat șofer ${m.nr}: ${_oldDriver||'—'} → ${newDriver} de ${currentUser?.name}`);
+  flotaBackupAuto(`Schimbat șofer ${m.nr}: ${_oldDriver||'—'} → ${newDriver} de ${currentUser?.name}`);
   toast('Șofer schimbat');
 }
 
@@ -3564,31 +3563,57 @@ function renderStricate(){
     return;
   }
   // Pentru fiecare, găsesc ultima intrare în log unde a fost marcată stricată
+  const _eis=isEiselfingUser();
+  const _esc=x=>String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   sec.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">'+
     stricate.map(m=>{
-      const tipColor = m.tip==='CRAFTER' ? 'var(--crafter)' : m.tip==='T6' ? 'var(--t6)' : m.tip==='ELEKTRO' ? 'var(--elektro)' : '#444';
       const lastLog = log.slice().reverse().find(l => l.nr===m.nr && (l.sofer||'').toUpperCase()==='STRICATA');
       const since = lastLog?.preluat ? fmtDt(lastLog.preluat) : '—';
       const by = lastLog?.preluatBy || '—';
-      return `<div style="background:var(--surface);border:1px solid rgba(255,90,90,.3);border-radius:var(--radius);padding:14px 16px;position:relative;overflow:hidden">
-        <div style="position:absolute;top:0;left:0;width:3px;height:100%;background:var(--danger)"></div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <span class="tip-badge tip-${m.tip||'unknown'}">${m.tip||'?'}</span>
-          <button class="icon-btn" onclick="openEditCar(${m.id})">✎</button>
-        </div>
-        <div style="font-family:var(--mono);font-size:16px;font-weight:500;margin-bottom:10px;letter-spacing:.04em">${m.nr}</div>
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Stricată din</div>
-        <div style="font-family:var(--mono);font-size:13px;color:var(--text);margin-bottom:8px">${since}</div>
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Marcată de</div>
-        <div style="font-size:13px;color:var(--text2);margin-bottom:12px">${by}</div>
-        <div class="card-driver-wrap" id="cdw-${m.id}">
+      const act = taskuri.filter(t=>t.masinaNr===m.nr && t.status!=='done');
+      const mecName=u=>{ const k=knownUsers.find(x=>x.username===u); return k?.name || String(u||'').replace('-srv',''); };
+      const svc = act.length
+        ? `<div style="background:rgba(255,159,74,.1);border:1px solid rgba(255,159,74,.35);border-radius:6px;padding:8px 10px;margin-bottom:12px"><div style="font-size:12px;font-weight:600;color:var(--t6)">🔧 În reparație la service · ${act.length} ${act.length===1?'sarcină activă':'sarcini active'}</div>${act.slice(0,3).map(t=>`<div style="font-size:12px;color:var(--text2);margin-top:4px">• ${_esc((t.descriere||'').slice(0,90))}${t.asignat?' <span style="color:var(--text3)">('+_esc(mecName(t.asignat))+')</span>':''}${t.deadline?' <span style="color:var(--text3)">· termen '+_esc(t.deadline.split('-').reverse().join('.'))+'</span>':''}</div>`).join('')}${act.length>3?`<div style="font-size:11px;color:var(--text3);margin-top:4px">… și încă ${act.length-3}</div>`:''}</div>`
+        : `<div style="background:rgba(46,158,91,.1);border:1px solid rgba(46,158,91,.35);border-radius:6px;padding:8px 10px;margin-bottom:12px;font-size:12px;font-weight:600;color:#2e9e5b">✅ Nicio sarcină activă în service — reparația pare finalizată</div>`;
+      const origin = m.strOrigin ? `<div style="font-size:11px;color:var(--text3);margin-bottom:10px">Dinainte: <b style="color:var(--text2)">${_esc(m.strOrigin)}</b></div>` : '';
+      const bottom = _eis
+        ? `<button class="btn ${act.length?'':'btn-primary'}" onclick="eisTakeStricata(${m.id})" style="width:100%">↩ Preia la Eiselfing${act.length?' (reparație în curs)':''}</button>`
+        : `<div class="card-driver-wrap" id="cdw-${m.id}">
         <div class="driver-select" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between" onclick="cardDriverOpen(${m.id}, event)">
           <span id="cdv-${m.id}">${m.sofer||'— nealocat —'}</span>
           <svg width="10" height="6" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1l4 4 4-4" stroke="#888" stroke-width="1.5" stroke-linecap="round"/></svg>
         </div>
-      </div>
+      </div>`;
+      return `<div style="background:var(--surface);border:1px solid rgba(255,90,90,.3);border-radius:var(--radius);padding:14px 16px;position:relative;overflow:hidden">
+        <div style="position:absolute;top:0;left:0;width:3px;height:100%;background:var(--danger)"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <span class="tip-badge tip-${m.tip||'unknown'}">${m.tip||'?'}</span>
+          ${_eis?'':`<button class="icon-btn" onclick="openEditCar(${m.id})">✎</button>`}
+        </div>
+        <div style="font-family:var(--mono);font-size:16px;font-weight:500;margin-bottom:10px;letter-spacing:.04em">${m.nr}</div>
+        ${origin}
+        ${svc}
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Stricată din</div>
+        <div style="font-family:var(--mono);font-size:13px;color:var(--text);margin-bottom:8px">${since}</div>
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Marcată de</div>
+        <div style="font-size:13px;color:var(--text2);margin-bottom:12px">${by}</div>
+        ${bottom}
       </div>`;
     }).join('')+'</div>';
+}
+
+// Eiselfing preia o mașină stricată (după reparație) înapoi la ei
+function eisTakeStricata(carId){
+  const m=masini.find(x=>x.id===carId); if(!m) return;
+  const act=taskuri.filter(t=>t.masinaNr===m.nr && t.status!=='done');
+  if(act.length && !confirm(`${m.nr} mai are ${act.length} ${act.length===1?'sarcină activă':'sarcini active'} în service.\nSigur o preiei la Eiselfing?`)) return;
+  askChangeDriver(carId,'EISELFING');
+}
+window.eisTakeStricata=eisTakeStricata;
+function updateStricateBadge(){
+  const b=document.getElementById('tab-btn-stricate'); if(!b) return;
+  const n=masini.filter(m=>sk(m.sofer)==='STRICATA').length;
+  b.textContent='🔧 Stricate'+(n?' ('+n+')':'');
 }
 
 // ── ADMIN ────────────────────────────────────────────────────────────
@@ -5792,16 +5817,16 @@ function srvRefreshAfterCost(){
 }
 
 function showSrvTab(name){
-  ['active','taskuri','istoric','adauga','masini','stoc','garantie','backup','admin'].forEach(t=>{
+  if(name==='active') name='taskuri';   // tabul „Reparații active" a fost scos; reparațiile în curs apar în Sarcini
+  ['taskuri','istoric','adauga','masini','stoc','garantie','backup','admin'].forEach(t=>{
     const el=document.getElementById('srv-tab-'+t);
     if(el) el.style.display=t===name?'':'none';
   });
   const btns = document.querySelectorAll('#app-service .tab-btn');
   btns.forEach(b=>b.classList.remove('active'));
-  const idx = ['active','taskuri','istoric','adauga','masini','stoc','garantie','backup','admin'].indexOf(name);
+  const idx = ['taskuri','adauga','masini','istoric','stoc','garantie','backup','admin'].indexOf(name);
   if(idx>=0 && btns[idx]) btns[idx].classList.add('active');
-  if(name==='active') renderSrvActive();
-  if(name==='taskuri'){ updateSrvAdminUI(); renderSrvTaskuri(); }
+  if(name==='taskuri'){ updateSrvAdminUI(); renderSrvTaskuri(); renderSrvActive(); }
   if(name==='istoric') renderSrvIstoric();
   if(name==='adauga') renderSrvAdauga();
   if(name==='masini') renderSrvMasini();
@@ -5832,7 +5857,7 @@ function updateSrvAdminUI(){
 
   const sef = isSrvSef();
   const addTaskBtn = document.getElementById('srv-add-task-btn');
-  if(addTaskBtn) addTaskBtn.style.display = sef ? '' : 'none';
+  if(addTaskBtn) addTaskBtn.style.display = '';
 
   document.body.classList.toggle('user-mode', !isAdmin);
   document.body.classList.toggle('admin-mode', isAdmin);
@@ -5868,7 +5893,8 @@ function renderSrvTaskuri(){
 
   const sef = isSrvSef();
   const addBtn = document.getElementById('srv-add-task-btn');
-  if(addBtn) addBtn.style.display = sef ? '' : 'none';
+  if(addBtn) addBtn.style.display = '';
+  if(!window._taskFilterInit){ window._taskFilterInit=true; if(sef && currentTaskFilter==='me'){ currentTaskFilter='all'; document.querySelectorAll('[data-task-filter]').forEach(b=>b.classList.toggle('active', b.dataset.taskFilter==='all')); } }
 
   // Ascund filtrele Ioan/Vasile pentru mecanici (ei văd doar sarcinile lor)
   const filterToolbar = document.getElementById('srv-taskuri-toolbar');
@@ -5981,10 +6007,16 @@ function renderSrvTaskuri(){
     }).join('') + '</div>';
 }
 
+function srvTaskAsignatField(){
+  // mecanicii își adaugă sarcini doar pentru ei înșiși
+  const sel=document.getElementById('srv-task-asignat'); const wrap=sel&&sel.closest('.modal-field');
+  if(wrap) wrap.style.display=isSrvSef()?'':'none';
+}
 function srvOpenAddTask(){
-  if(!isSrvSef()){ toast('Doar șefii pot adăuga sarcini'); return; }
+  if(!currentUser){ return; }
   editingTaskId = null;
-  document.getElementById('srv-task-title').textContent = 'Sarcină nouă';
+  srvTaskAsignatField();
+  document.getElementById('srv-task-title').textContent = isSrvSef() ? 'Sarcină nouă' : 'Sarcină pentru mine';
   document.getElementById('srv-task-sub').textContent = '';
   document.getElementById('srv-task-delete-btn').style.display = 'none';
 
@@ -5994,7 +6026,7 @@ function srvOpenAddTask(){
     sortedMasini.map(m=>`<option value="${m.id}">${m.nr} (${m.tip||'?'})</option>`).join('');
   document.getElementById('srv-task-masina-info').style.display = 'none';
 
-  document.getElementById('srv-task-asignat').value = 'ion-srv';
+  document.getElementById('srv-task-asignat').value = isSrvSef() ? 'ion-srv' : currentUser.username;
   document.getElementById('srv-task-deadline').value = '';
   document.getElementById('srv-task-descriere').value = '';
   pkSet('task',[]);
@@ -6007,9 +6039,10 @@ function srvOpenEditTask(id){
   if(!t) return;
   if(!isSrvSef() && t.createdBy !== currentUser?.name){ toast('Nu ai acces'); return; }
   editingTaskId = id;
+  srvTaskAsignatField();
   document.getElementById('srv-task-title').textContent = 'Editează sarcina';
   document.getElementById('srv-task-sub').textContent = `${t.masinaNr} · pentru ${(QUICK_USERS_SERVICE.find(u=>u.username===t.asignat)||{}).name||t.asignat}`;
-  document.getElementById('srv-task-delete-btn').style.display = isSrvSef() ? '' : 'none';
+  document.getElementById('srv-task-delete-btn').style.display = (isSrvSef() || t.createdByUsername===currentUser?.username) ? '' : 'none';
 
   const sortedMasini = masini.slice().sort((a,b)=>(a.nr||'').localeCompare(b.nr||''));
   document.getElementById('srv-task-masina').innerHTML = sortedMasini.map(m=>`<option value="${m.id}"${m.id===t.masinaId?' selected':''}>${m.nr} (${m.tip||'?'})</option>`).join('');
@@ -6148,7 +6181,7 @@ function srvCloseTaskModal(){
 
 function srvSaveTask(){
   const masinaId = parseInt(document.getElementById('srv-task-masina').value);
-  const asignat = document.getElementById('srv-task-asignat').value;
+  const asignat = isSrvSef() ? document.getElementById('srv-task-asignat').value : (currentUser?.username||'');
   const deadline = document.getElementById('srv-task-deadline').value;
   const descriere = document.getElementById('srv-task-descriere').value.trim();
 
@@ -6198,7 +6231,8 @@ function srvSaveTask(){
 }
 
 function srvDeleteTask(){
-  if(!isSrvSef()){ toast('Doar șefii pot șterge sarcini'); return; }
+  const _t=taskuri.find(x=>x.id===editingTaskId);
+  if(!isSrvSef() && !(_t && _t.createdByUsername && _t.createdByUsername===currentUser?.username)){ toast('Poți șterge doar sarcinile create de tine'); return; }
   if(!confirm('Ștergi sarcina?')) return;
   taskuri = taskuri.filter(x=>x.id!==editingTaskId);
   srvCloseTaskModal();
@@ -6379,11 +6413,11 @@ function renderSrvActive(){
     return (b.addedAt||'').localeCompare(a.addedAt||'');
   });
   if(active.length===0){
-    sec.innerHTML='<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:30px 20px;text-align:center"><div style="font-size:32px;margin-bottom:10px">🔧</div><div style="font-size:14px;color:var(--text2)">Nicio reparație activă.</div><div style="font-size:13px;color:var(--text3);margin-top:6px">Adaugă una din tabul "+ Adaugă"</div></div>';
+    sec.innerHTML='';
     updateSrvStats();
     return;
   }
-  sec.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px">' +
+  sec.innerHTML = '<div style="font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:10px">🔧 Reparații în curs ('+active.length+')</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px">' +
     active.map(r => srvCardHtml(r, true)).join('') + '</div>';
   updateSrvStats();
 }
@@ -6480,7 +6514,7 @@ function srvAddReparatie(){
   pkSet('add',[]);
 
   saveToCloud();
-  showSrvTab('active');
+  showSrvTab('taskuri');
 }
 
 function renderSrvMasini(){
@@ -6622,7 +6656,7 @@ document.getElementById('srv-modal-edit').addEventListener('click', e=>{
 
 // ── TABS ─────────────────────────────────────────────────────────────
 function showTab(name){
-  if(isEiselfingUser() && !['masini','soferi','disponibil','log','amenda'].includes(name)) name='masini';
+  if(isEiselfingUser() && !['masini','soferi','disponibil','log','amenda','stricate'].includes(name)) name='masini';
   ['masini','disponibil','log','amenda','soferi','setari','stricate','admin','backup-flota'].forEach(t=>{
     const el=document.getElementById('tab-'+t);
     if(el) el.style.display=t===name?'':'none';
@@ -6644,7 +6678,7 @@ function showTab(name){
   document.getElementById(id).addEventListener('click',e=>{if(e.target.id===id)fn();});
 });
 
-function renderAll(){renderCards();renderDisponibil();renderLog();renderSoferi();updateStats();if(document.getElementById('tab-setari').style.display!=='none')renderSetari();}
+function renderAll(){renderCards();renderDisponibil();renderLog();renderSoferi();updateStats();updateStricateBadge();if(document.getElementById('tab-stricate').style.display!=='none')renderStricate();if(document.getElementById('tab-setari').style.display!=='none')renderSetari();}
 
 // Expune funcțiile globale pentru onclick handlers
 window.showTab=showTab;
@@ -6791,7 +6825,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261022-150142';
+const APP_VERSION='20261023-155936';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
