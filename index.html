@@ -4538,7 +4538,7 @@ function scadeStoc(descriere, masinaTip){
 // ═════════════════════════════════════════════════════════════
 let flotaBackupuri = [];
 let flotaBackupIdCtr = 1;
-const MAX_FLOTA_BACKUPS = 10;
+const MAX_FLOTA_BACKUPS = 2; // copiile din document ocupau >500 KB (limita documentului e 1 MB); backup-urile reale sunt pe server (06:00 și 20:00)
 
 function flotaCreateSnapshot(triggerBy){
   const snap = {
