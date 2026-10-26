@@ -6394,6 +6394,7 @@ function srvCardHtml(r, allowEdit){
         ${r.addedBy?`<div style="margin-top:2px">de ${r.addedBy}</div>`:''}
       </div>
       <div style="display:flex;align-items:center;gap:8px">
+        ${isActive ? `<button onclick="srvQuickFinalize(${r.id})" style="background:var(--accent);border:none;color:#fff;cursor:pointer;font-size:12px;padding:6px 10px;border-radius:4px;font-weight:500;font-family:var(--sans)">✓ Finalizează</button>` : ''}
         ${addCostBtn}
         <div style="font-family:var(--mono);font-size:15px;font-weight:500;color:var(--accent);white-space:nowrap" class="srv-cost-display"><span${editCostAttr}>${(Number(r.cost)||0).toFixed(2)} €${(isSrvSef() && r.cost>0)?' ✎':''}</span></div>
       </div>
@@ -6575,6 +6576,15 @@ function srvOpenEdit(id){
   pkSet('edit', r.piese||[]);
   document.getElementById('srv-modal-edit').classList.add('open');
 }
+// Finalizare rapidă: deschide editarea cu starea „finalizată"; mecanicul completează km și salvează
+function srvQuickFinalize(id){
+  srvOpenEdit(id);
+  const st = document.getElementById('srv-edit-status');
+  if(st) st.value = 'done';
+  const km = document.getElementById('srv-edit-km');
+  if(km && !km.value) km.focus();
+}
+window.srvQuickFinalize = srvQuickFinalize;
 function srvCloseEdit(){
   document.getElementById('srv-modal-edit').classList.remove('open');
   editingRepId = null;
