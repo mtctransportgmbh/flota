@@ -5918,9 +5918,17 @@ function renderSrvTaskuri(){
       // Butoane: Editează (doar pentru șef și creator), Marchează finalizată (pentru asignat sau șef)
       const sef = isSrvSef();
       const canEdit = sef || (currentUser && t.createdBy === currentUser.name);
-      const canComplete = t.status !== 'done' && (sef || (currentUser && t.asignat === currentUser.username));
+      const isMine = sef || (currentUser && t.asignat === currentUser.username);
+      const canAccept = t.status === 'pending' && isMine;
+      const canComplete = t.status === 'accepted' && isMine;
+      if(t.status === 'accepted'){
+        deadlineHtml = `<span style="font-size:11px;font-weight:500;padding:3px 8px;border-radius:3px;background:rgba(74,158,255,.14);color:var(--crafter);font-family:var(--mono)">🔧 ÎN LUCRU</span> ` + deadlineHtml;
+      }
 
       let actions = '';
+      if(canAccept){
+        actions += `<button onclick="srvAcceptTask(${t.id})" style="background:var(--accent);border:none;color:#fff;cursor:pointer;font-size:12px;padding:8px 14px;border-radius:4px;font-weight:500;font-family:var(--sans)">▶ Acceptă sarcina</button>`;
+      }
       if(canComplete){
         actions += `<button onclick="srvOpenComplete(${t.id})" style="background:var(--accent);border:none;color:#fff;cursor:pointer;font-size:12px;padding:8px 14px;border-radius:4px;font-weight:500;font-family:inherit">✓ Marchează finalizată</button>`;
       }
@@ -6209,6 +6217,34 @@ function srvRequireKm(kmStr, masinaId, masinaNr, inputId){
 
 document.addEventListener('input', e=>{ if(['srv-complete-km','srv-edit-km','srvm-add-km'].includes(e.target.id)) e.target.style.borderColor=''; });
 
+// Mecanicul acceptă sarcina primită: de acum apare „în lucru" (reparație activă legată de sarcină)
+function srvAcceptTask(id){
+  const t = taskuri.find(x=>x.id===id);
+  if(!t || t.status !== 'pending') return;
+  if(!isSrvSef() && t.asignat !== currentUser?.username){ toast('Nu ești asignat la această sarcină'); return; }
+  const today = new Date();
+  const dataStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  t.status = 'accepted';
+  t.acceptedBy = currentUser?.name || 'unknown';
+  t.acceptedByUsername = currentUser?.username || '';
+  t.acceptedAt = new Date().toISOString();
+  reparatii.push({
+    id: repIdCtr++,
+    masinaId: t.masinaId, masinaNr: t.masinaNr, masinaTip: t.masinaTip,
+    data: dataStr, km: null,
+    descriere: t.descriere, cost: 0, obs: '',
+    status: 'active', fromTaskId: t.id,
+    piese: (t.piese||[]).map(x=>({...x})),
+    addedBy: currentUser?.name || 'unknown',
+    addedByUsername: currentUser?.username || '',
+    addedAt: new Date().toISOString()
+  });
+  saveToCloud();
+  renderSrvAll();
+  toast('Sarcină acceptată — e acum în lucru');
+}
+window.srvAcceptTask = srvAcceptTask;
+
 // Marcare task ca finalizat — creează automat reparația
 let completingTaskId = null;
 function srvOpenComplete(id){
@@ -6253,20 +6289,35 @@ function srvFinalizeTask(){
 
   const today = new Date();
   const dataStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-  reparatii.push({
-    id: repIdCtr++,
-    masinaId: t.masinaId, masinaNr: t.masinaNr, masinaTip: t.masinaTip,
-    data: dataStr,
-    km: km ? Number(km) : null,
-    descriere: t.descriere,
-    cost: (cost ? Number(cost) : 0) + _partsCost,
-    costPiese: _partsCost,
-    obs, status: 'done', fromTaskId: t.id,
-    piese: _pk.done.map(x=>({...x})), stocScazut: true,
-    addedBy: currentUser?.name || 'unknown',
-    addedByUsername: currentUser?.username || '',
-    addedAt: new Date().toISOString()
-  });
+  const _activeRep = reparatii.find(r => r.fromTaskId === t.id && r.status === 'active');
+  if(_activeRep){
+    // reparația „în lucru" creată la acceptare devine finalizată
+    Object.assign(_activeRep, {
+      data: dataStr,
+      km: km ? Number(km) : null,
+      cost: (cost ? Number(cost) : 0) + _partsCost,
+      costPiese: _partsCost,
+      obs, status: 'done',
+      piese: _pk.done.map(x=>({...x})), stocScazut: true,
+      completedBy: currentUser?.name || 'unknown',
+      completedAt: new Date().toISOString()
+    });
+  } else {
+    reparatii.push({
+      id: repIdCtr++,
+      masinaId: t.masinaId, masinaNr: t.masinaNr, masinaTip: t.masinaTip,
+      data: dataStr,
+      km: km ? Number(km) : null,
+      descriere: t.descriere,
+      cost: (cost ? Number(cost) : 0) + _partsCost,
+      costPiese: _partsCost,
+      obs, status: 'done', fromTaskId: t.id,
+      piese: _pk.done.map(x=>({...x})), stocScazut: true,
+      addedBy: currentUser?.name || 'unknown',
+      addedByUsername: currentUser?.username || '',
+      addedAt: new Date().toISOString()
+    });
+  }
 
   // Scade din stoc piesele alese
   t.piese = _pk.done.map(x=>({...x}));
@@ -6431,21 +6482,29 @@ function srvAddReparatie(){
     ? !!(document.getElementById('srv-new-piesa-nep')?.checked)
     : false;
 
+  // O reparație adăugată manual e deja făcută: intră direct în istoric (finalizată), nu „în lucru".
+  // „În lucru" apare doar când mecanicul acceptă o sarcină primită.
+  const _piese = _pk.add.map(x=>({...x}));
+  let _cp = 0, _short = [];
+  if(_piese.length){
+    pkStamp(_piese);
+    _cp = pkCost(_piese);
+    _short = pkDeduct(_piese, 'reparație adăugată · '+m.nr);
+  }
   reparatii.push({
     id: repIdCtr++,
     masinaId: m.id, masinaNr: m.nr, masinaTip: m.tip,
     data, km: km ? Number(km) : null,
-    descriere, cost: cost ? Number(cost) : 0, obs,
-    status: 'active',
-    piese: _pk.add.map(x=>({...x})),
+    descriere, cost: (cost ? Number(cost) : 0) + _cp, costPiese: _cp, obs,
+    status: 'done',
+    piese: _piese, stocScazut: _piese.length > 0,
     piesaNepotrivita,
     addedBy: currentUser?.name || 'unknown',
     addedByUsername: currentUser?.username || '',
     addedAt: new Date().toISOString()
   });
 
-  // Piesele alese se scad din stoc la finalizarea reparației
-  toast('Reparație adăugată');
+  toast(_short.length ? ('Reparație adăugată · ⚠ Stoc insuficient pentru: '+_short.join(', ')) : 'Reparație adăugată');
 
   // Backup automat la reparație nouă
   backupAuto(`Reparație nouă — ${m.nr} de ${currentUser?.name}`);
