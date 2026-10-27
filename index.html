@@ -2181,7 +2181,7 @@ window.addEventListener('firebase-ready', ()=>{
         uid:user.uid,
         email:'',
         username:username,
-        name:((QUICK_USERS_FLOTA.concat(QUICK_USERS_SERVICE)).find(q=>q.username===username)||{}).name||user.displayName||username
+        name:((QUICK_USERS_FLOTA.concat(QUICK_USERS_SERVICE)).find(q=>q.username===username)||{}).name||(username==='paulandreimacarie@yahoo.com'?'Paul':(user.displayName||username))
       };
 
       // Determine modul-ul: dacă username se termină în -srv, e Service
@@ -2378,7 +2378,11 @@ function hydrateFromCloud(d){
   // Redenumire „Ion" -> „Ioan" în datele vechi (nume afișate)
   (function(){
     let ch=false; const F=['addedBy','completedBy','createdBy','editedBy','preluatBy','restituitBy','name'];
-    const fix=o=>{ F.forEach(k=>{ if(o && o[k]==='Ion'){ o[k]='Ioan'; ch=true; } }); };
+    const fix=o=>{ F.forEach(k=>{
+      if(o && o[k]==='Ion'){ o[k]='Ioan'; ch=true; }
+      // adresa de email a adminului nu se mai afișează: în datele vechi devine „Paul”
+      if(o && o[k]==='paulandreimacarie@yahoo.com'){ o[k]='Paul'; ch=true; }
+    }); };
     [taskuri,reparatii,log,knownUsers].forEach(arr=>arr.forEach(fix));
     if(ch) setTimeout(()=>saveToCloud(),1200);
   })();
@@ -5932,6 +5936,9 @@ function renderSrvTaskuri(){
       if(canComplete){
         actions += `<button onclick="srvOpenComplete(${t.id})" style="background:var(--accent);border:none;color:#fff;cursor:pointer;font-size:12px;padding:8px 14px;border-radius:4px;font-weight:500;font-family:inherit">✓ Marchează finalizată</button>`;
       }
+      if(t.status === 'accepted' && isMine){
+        actions += `<button onclick="srvEditWork(${t.id})" style="background:none;border:1px solid var(--border2);color:var(--text2);cursor:pointer;font-size:12px;padding:7px 12px;border-radius:4px;font-family:inherit">✎ Editează lucrarea</button>`;
+      }
       if(canEdit){
         actions += `<button onclick="srvOpenEditTask(${t.id})" style="background:none;border:1px solid var(--border2);color:var(--text2);cursor:pointer;font-size:12px;padding:7px 12px;border-radius:4px;font-family:inherit">✎ Editează</button>`;
       }
@@ -6259,8 +6266,10 @@ function srvOpenComplete(id){
   const _kmLbl = document.querySelector('#srv-modal-complete .modal-label');
   if(_kmLbl) _kmLbl.textContent = 'Kilometraj (km) — OBLIGATORIU *';
   document.getElementById('srv-complete-cost').value = '';
-  document.getElementById('srv-complete-obs').value = '';
-  pkSet('done', t.piese||[]);
+  const _wr = reparatii.find(r => r.fromTaskId === t.id && r.status === 'active');
+  document.getElementById('srv-complete-obs').value = (_wr && _wr.obs) || '';
+  if(_wr && _wr.km) document.getElementById('srv-complete-km').value = _wr.km;
+  pkSet('done', (_wr ? _wr.piese : t.piese) || []);
   document.getElementById('srv-modal-complete').classList.add('open');
 }
 
@@ -6562,10 +6571,25 @@ function renderSrvAdmin(){
 }
 
 // Editare reparație
+// Mecanicul care a acceptat sarcina își poate edita lucrarea (descriere, piese din stoc, observații, km);
+// mașina rămâne blocată și finalizarea se face doar din „Marchează finalizat".
+function srvEditWork(taskId){
+  const t = taskuri.find(x=>x.id===taskId);
+  if(!t) return;
+  if(!isSrvSef() && t.asignat !== currentUser?.username){ toast('Nu ești asignat la această sarcină'); return; }
+  const rep = reparatii.find(r => r.fromTaskId === taskId && r.status === 'active');
+  if(!rep){ toast('Nu există lucrare în curs pentru această sarcină'); return; }
+  srvOpenEdit(rep.id);
+}
+window.srvEditWork = srvEditWork;
 function srvOpenEdit(id){
   const r = reparatii.find(x=>x.id===id);
   if(!r){ toast('Reparație negăsită'); return; }
   editingRepId = id;
+  // lucrare legată de o sarcină, în lucru, editată de mecanic: fără schimbare de status (doar prin finalizare)
+  const _worker = !!(r.fromTaskId && r.status === 'active' && !isSrvSef());
+  const _stF = document.getElementById('srv-edit-status');
+  if(_stF && _stF.parentElement) _stF.parentElement.style.display = _worker ? 'none' : '';
   document.getElementById('srv-edit-sub').textContent = `${r.masinaNr} · ${r.masinaTip||'?'}`;
   document.getElementById('srv-edit-status').value = r.status || 'active';
   document.getElementById('srv-edit-data').value = r.data || '';
@@ -6596,7 +6620,14 @@ function srvSaveEdit(){
     if(srvRequireKm(document.getElementById('srv-edit-km').value, r.masinaId, r.masinaNr, 'srv-edit-km') === null) return;
   }
   if(!pkGuard('edit')) return;
+  if(r.fromTaskId && r.status === 'active' && !isSrvSef()){
+    document.getElementById('srv-edit-status').value = 'active';   // mecanicul nu poate finaliza din editare
+  }
   r.status = document.getElementById('srv-edit-status').value;
+  if(r.fromTaskId && r.status === 'done'){      // reparația legată de sarcină finalizată din editare → și sarcina e finalizată
+    const _t = taskuri.find(x=>x.id===r.fromTaskId);
+    if(_t && _t.status !== 'done'){ _t.status = 'done'; _t.completedBy = currentUser?.name || 'unknown'; _t.completedByUsername = currentUser?.username || ''; _t.completedAt = new Date().toISOString(); }
+  }
   r.data = document.getElementById('srv-edit-data').value;
   const kmVal = document.getElementById('srv-edit-km').value;
   r.km = kmVal ? Number(kmVal) : null;
