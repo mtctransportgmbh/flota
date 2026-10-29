@@ -1762,13 +1762,15 @@ function canEditStoc(){
 function isEiselfingUser(){
   return !!currentUser && !isAdminUser && currentUser.username==='eiselfing';
 }
+// Un șofer poate lucra în mai multe locații (câmpul `locs`, completat de sincronizarea din Angajați)
+function hasLoc(s,loc){ return !!s && typeof s==='object' && (s.location===loc || (Array.isArray(s.locs) && s.locs.includes(loc))); }
 function visSoferi(){
   const l=soferi.map(s => typeof s === 'string' ? {name:s, location:''} : s);
-  return isEiselfingUser() ? l.filter(s=>s.location==='Eiselfing') : l;
+  return isEiselfingUser() ? l.filter(s=>hasLoc(s,'Eiselfing')) : l;
 }
 function visibleNrSet(){ return new Set(visibleMasini().map(m=>(m.nr||'').toUpperCase())); }
 function visibleMasini(){
-  return isEiselfingUser() ? masini.filter(m=>pcLocationOf(m)==='Eiselfing') : masini;
+  return isEiselfingUser() ? masini.filter(m=>pcLocationOf(m)==='Eiselfing' || hasLoc(soferi.find(x=>x && x.name===m.sofer),'Eiselfing')) : masini;
 }
 // Helper: e șef în Service?
 function isSrvSef(){
@@ -1823,7 +1825,7 @@ function getSoferiNames(){
 function buildOpts(sel, filter=''){
   const q = filter.toLowerCase();
   const soferiList = visSoferi();
-  const eisel = soferiList.filter(s=>s.location==='Eiselfing').sort((a,b)=>a.name.localeCompare(b.name));
+  const eisel = soferiList.filter(s=>hasLoc(s,'Eiselfing')).sort((a,b)=>a.name.localeCompare(b.name));
   const ruhst = soferiList.filter(s=>s.location==='Ruhstorf').sort((a,b)=>a.name.localeCompare(b.name));
   const paket = soferiList.filter(s=>s.location==='Paketshop').sort((a,b)=>a.name.localeCompare(b.name));
   const other = soferiList.filter(s=>!s.location || (s.location!=='Eiselfing' && s.location!=='Ruhstorf' && s.location!=='Paketshop')).sort((a,b)=>a.name.localeCompare(b.name));
@@ -2699,12 +2701,21 @@ function _mergeDoc(remote, payload){
   }
   return merged;
 }
+// Firestore refuză valorile `undefined` (ex. câmp lăsat gol la o mașină/șofer nou) → le scoatem din obiecte și le facem null în liste
+function _noUndef(v){
+  if(Array.isArray(v)) return v.map(x=>x===undefined?null:_noUndef(x));
+  if(v && typeof v==='object' && Object.getPrototypeOf(v)===Object.prototype){
+    const o={}; Object.keys(v).forEach(k=>{ if(v[k]!==undefined) o[k]=_noUndef(v[k]); }); return o;
+  }
+  return v;
+}
+window._noUndef=_noUndef;
 window.mergeSetDoc=async function(ref, payload){
   const H=window.fbHelpers;
   await H.runTransaction(window.fbDb, async tx=>{
     const snap=await tx.get(ref);
     const remote=snap.exists()?snap.data():{};
-    tx.set(ref, _mergeDoc(remote, payload));
+    tx.set(ref, _noUndef(_mergeDoc(remote, payload)));
   });
   // baseline = ce știm acum că e în cloud din partea noastră
   const nb=_serialLocal(); Object.keys(payload).forEach(k=>{ if(k in nb) nb[k]=payload[k]; });
@@ -2757,7 +2768,7 @@ function saveToCloud(){
       lastModifiedAt: new Date().toISOString()
     };
     try{
-      await window.fbHelpers.setDoc(window.fbDocRef, payload);
+      await window.fbHelpers.setDoc(window.fbDocRef, window._noUndef(payload));
       isSaving=false;
     } catch(e){
       console.error('Save failed:', e);
@@ -2946,7 +2957,7 @@ function cardDriverRenderList(carId, q, current){
     }
   } else {
     specials.forEach(s=>{ html+=optHtml(s.name, s.label); });
-    const eisel = soferiList.filter(s=>s.location==='Eiselfing').sort((a,b)=>a.name.localeCompare(b.name));
+    const eisel = soferiList.filter(s=>hasLoc(s,'Eiselfing')).sort((a,b)=>a.name.localeCompare(b.name));
     const ruhst = soferiList.filter(s=>s.location==='Ruhstorf').sort((a,b)=>a.name.localeCompare(b.name));
     const paket = soferiList.filter(s=>s.location==='Paketshop').sort((a,b)=>a.name.localeCompare(b.name));
     const other = soferiList.filter(s=>!s.location||(s.location!=='Eiselfing'&&s.location!=='Ruhstorf'&&s.location!=='Paketshop')).sort((a,b)=>a.name.localeCompare(b.name));
@@ -3277,7 +3288,7 @@ function renderSoferi(){
   }
   // Sortez și grupez pe locație
   const soferiList = soferi.map(s => typeof s === 'string' ? {name:s, location:''} : s);
-  const eisel = soferiList.filter(s=>s.location==='Eiselfing').sort((a,b)=>a.name.localeCompare(b.name));
+  const eisel = soferiList.filter(s=>hasLoc(s,'Eiselfing')).sort((a,b)=>a.name.localeCompare(b.name));
   const _onlyE=isEiselfingUser();
   const ruhst = _onlyE?[]:soferiList.filter(s=>s.location==='Ruhstorf').sort((a,b)=>a.name.localeCompare(b.name));
   const paket = _onlyE?[]:soferiList.filter(s=>s.location==='Paketshop').sort((a,b)=>a.name.localeCompare(b.name));
@@ -3772,7 +3783,7 @@ async function initNotifications(){
             lastModifiedBy: currentUser.name,
             lastModifiedAt: new Date().toISOString()
           };
-          await window.fbHelpers.setDoc(window.fbDocRef, payload);
+          await window.fbHelpers.setDoc(window.fbDocRef, window._noUndef(payload));
           console.log(`[NOTIF] ✓ Token salvat în Firestore pentru ${currentUser.username}`);
         } catch(saveErr){
           console.error('[NOTIF] ✗ Eroare salvare token în Firestore:', saveErr.message);
@@ -5215,7 +5226,7 @@ async function doActivateNotif(){
       knownUsers.push({username:currentUser.username,name:currentUser.name,pushToken:token,pushTokens:[token],pushTokenUpdatedAt:new Date().toISOString(),firstSeen:new Date().toISOString(),lastSeen:new Date().toISOString()});
     }
     const payload={masini,soferi,log:log.map(l=>({...l,preluat:l.preluat?l.preluat.toISOString():null,restituit:l.restituit?l.restituit.toISOString():null})),carIdCtr,logIdCtr,admins,knownUsers,forcedLogouts:window._currentForcedLogouts||{},reparatii,repIdCtr,taskuri,taskIdCtr,stoc,stocIdCtr,backupuri:backupuri.map(b=>({id:b.id,timestamp:b.timestamp,triggerBy:b.triggerBy,size:b.size||0})),backupIdCtr,flotaBackupuri:flotaBackupuri.map(b=>({id:b.id,timestamp:b.timestamp,triggerBy:b.triggerBy,size:b.size||0,snapshot:b.snapshot||''})),flotaBackupIdCtr,garantii,garantiiIdCtr,lastModifiedBy:currentUser.name,lastModifiedAt:new Date().toISOString()};
-    await window.fbHelpers.setDoc(window.fbDocRef, payload);
+    await window.fbHelpers.setDoc(window.fbDocRef, window._noUndef(payload));
     const u = knownUsers.find(x=>x.username===currentUser.username);
     box.innerHTML = `✓ ACTIVAT!<br>Token: ${token.slice(0,25)}...<br>Dispozitive: ${u?.pushTokens?.length||1}<br><br>Apasă 📱 Test pentru a verifica.`;
   } catch(e) {
@@ -5431,7 +5442,7 @@ async function refreshPushToken(){
       lastModifiedBy: currentUser.name,
       lastModifiedAt: new Date().toISOString()
     };
-    await window.fbHelpers.setDoc(window.fbDocRef, payload);
+    await window.fbHelpers.setDoc(window.fbDocRef, window._noUndef(payload));
 
     if(box) box.innerHTML = `✓ Token reîmprospătat cu succes<br>${token.slice(0,30)}...<br><br>Testează cu o sarcină nouă.`;
     toast('✓ Token actualizat — notificările ar trebui să funcționeze acum');
@@ -6801,7 +6812,7 @@ async function resetAllPushTokens(){
       lastModifiedBy: currentUser.name,
       lastModifiedAt: new Date().toISOString()
     };
-    await window.fbHelpers.setDoc(window.fbDocRef, payload);
+    await window.fbHelpers.setDoc(window.fbDocRef, window._noUndef(payload));
     toast('✓ Toate token-urile au fost șterse. Roagă fiecare user să apese 🔔 Activează.');
     renderSrvAdmin();
   } catch(e) {
