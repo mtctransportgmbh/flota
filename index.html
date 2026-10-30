@@ -426,6 +426,7 @@ body.user-mode .log-mobile-card {
   .srvm-add summary{font-size:15px;padding:10px 0;}
 }
 }
+.stoc-cp{display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;user-select:none}.stoc-cp input{width:auto;margin:0}
 </style>
 </head>
 <body>
@@ -1310,13 +1311,14 @@ body.user-mode .log-mobile-card {
       </div>
       <div class="modal-field">
         <div class="modal-label">Tip mașină</div>
-        <select id="stoc-new-compat">
-          <option value="CRAFTER">CRAFTER</option>
-          <option value="T6">T6</option>
-          <option value="ELEKTRO">ELEKTRO</option>
-          <option value="ALTELE">ALTELE</option>
-          <option value="Universal">Universal (toate)</option>
-        </select>
+        <div id="stoc-new-compat" style="display:flex;flex-wrap:wrap;gap:8px">
+          <label class="stoc-cp"><input type="checkbox" value="CRAFTER"> CRAFTER</label>
+          <label class="stoc-cp"><input type="checkbox" value="T6"> T6</label>
+          <label class="stoc-cp"><input type="checkbox" value="ELEKTRO"> ELEKTRO</label>
+          <label class="stoc-cp"><input type="checkbox" value="ALTELE"> ALTELE</label>
+          <label class="stoc-cp"><input type="checkbox" value="Universal"> Universal (toate)</label>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">Poți bifa mai multe tipuri (ex: CRAFTER + ELEKTRO).</div>
       </div>
     </div>
     <div id="stoc-tire-fields" style="display:none;grid-template-columns:1fr 1fr;gap:10px">
@@ -1595,6 +1597,14 @@ body.user-mode .log-mobile-card {
 <!-- ──────────────────────────────────────────────────────────── -->
 <!-- Încarcă configurația din fișierul config.js (separat) -->
 <script src="config.js"></script>
+
+<!-- Manager backup pe module (restaurare pe modul / element) -->
+<div class="modal-overlay" id="bkm-modal" onclick="if(event.target===this)bkmClose()">
+  <div class="modal" style="max-width:720px;max-height:90vh;overflow-y:auto">
+    <div class="modal-title">🧩 Manager backup pe module</div>
+    <div id="bkm-body"></div>
+  </div>
+</div>
 
 <!-- Manager backup: restaurare -->
 <div class="modal-overlay" id="bm-modal-restore" onclick="if(event.target===this)bmRestoreClose()">
@@ -4112,8 +4122,7 @@ function renderStoc(){
   sec.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">'+
     list.map(s=>{
       const cantColor=s.cantitate===0?'var(--danger)':s.cantitate<=stocPrag(s)?'var(--t6)':'var(--accent)';
-      const tipColor = s.compatibil==='CRAFTER'?'var(--crafter)':s.compatibil==='T6'?'var(--t6)':'#888';
-      const tipLabel = s.compatibil||'Universal';
+      const tipChips = (compatList(s.compatibil).length?compatList(s.compatibil):['Universal']).map(t=>{const c=t.toUpperCase()==='CRAFTER'?'var(--crafter)':t.toUpperCase()==='T6'?'var(--t6)':'#888';return `<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;background:${c}22;color:${c};font-family:var(--mono)">${t}</span>`;}).join('');
       const editBtn=canEditStoc()?`<button class="icon-btn" onclick="stocOpenEdit(${s.id})">✎</button>`:'';
       return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
@@ -4123,7 +4132,7 @@ function renderStoc(){
               ${s.marime?`<span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:3px;background:rgba(18,24,38,.08);color:var(--text);font-family:var(--mono)">⭕ ${s.marime}</span>`:''}
               ${s.sezon?`<span style="font-size:10px;padding:2px 7px;border-radius:3px;background:rgba(100,100,100,.1);color:var(--text2)">${s.sezon}</span>`:''}
               ${s.owner?`<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;background:rgba(74,158,255,.12);color:#2f7fd6">${s.owner==='ion-srv'?'Ioan':s.owner==='vasile-srv'?'Vasile':s.owner}</span>`:'<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;background:rgba(255,159,74,.15);color:var(--t6)">nealocat — alege stocul</span>'}
-              <span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;background:${tipColor}22;color:${tipColor};font-family:var(--mono)">${tipLabel}</span>
+              ${tipChips}
               ${s.aniCompatibili?`<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;background:rgba(100,100,100,.1);color:var(--text2);font-family:var(--mono)">${s.aniCompatibili}</span>`:''}
               <span style="font-size:11px;color:var(--text3)">${s.categorie||'—'}</span>
             </div>
@@ -4141,6 +4150,16 @@ function renderStoc(){
     }).join('')+'</div>';
 }
 
+function compatList(v){return String(v||'').split(/[,;+\/]+/).map(x=>x.trim()).filter(Boolean);}
+function stocSetCompat(v){
+  const l=compatList(v).map(x=>x.toUpperCase());
+  document.querySelectorAll('#stoc-new-compat input').forEach(c=>{c.checked=l.includes(c.value.toUpperCase());});
+}
+function stocGetCompat(){
+  const l=[...document.querySelectorAll('#stoc-new-compat input:checked')].map(c=>c.value);
+  if(l.includes('Universal')) return 'Universal';
+  return l.join(', ')||null;
+}
 function stocOpenAdd(){
   if(!canEditStoc()){toast('Nu ai drept să adaugi piese');return;}
   editingStocId=null;
@@ -4148,7 +4167,7 @@ function stocOpenAdd(){
   document.getElementById('stoc-delete-btn').style.display='none';
   ['stoc-new-nume','stoc-new-cant','stoc-new-pret','stoc-new-cod','stoc-new-ani'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('stoc-new-cat').value='Filtre';
-  document.getElementById('stoc-new-compat').value='CRAFTER';
+  stocSetCompat('CRAFTER');
   document.getElementById('stoc-new-marime').value=''; document.getElementById('stoc-new-sezon').value='';
   document.getElementById('stoc-new-comun').checked=false;
   const _mu=['ion-srv','vasile-srv'];
@@ -4167,7 +4186,7 @@ function stocOpenEdit(id){
   document.getElementById('stoc-new-cat').value=s.categorie||'Filtre';
   document.getElementById('stoc-new-cant').value=s.cantitate||0;
   document.getElementById('stoc-new-pret').value=s.pret||'';
-  document.getElementById('stoc-new-compat').value=s.compatibil||'CRAFTER';
+  stocSetCompat(s.compatibil||'CRAFTER');
   document.getElementById('stoc-new-cod').value=s.cod||'';
   document.getElementById('stoc-new-ani').value=s.aniCompatibili||'';
   document.getElementById('stoc-new-marime').value=s.marime||''; document.getElementById('stoc-new-sezon').value=s.sezon||'';
@@ -4197,7 +4216,7 @@ function stocSave(){
     categorie:document.getElementById('stoc-new-cat').value,
     cantitate:parseInt(document.getElementById('stoc-new-cant').value)||0,
     pret:parseFloat(document.getElementById('stoc-new-pret').value)||null,
-    compatibil:document.getElementById('stoc-new-compat').value.trim()||null,
+    compatibil:stocGetCompat(),
     cod:document.getElementById('stoc-new-cod').value.trim()||null,
     aniCompatibili:document.getElementById('stoc-new-ani').value.trim()||null,
     addedAt:new Date().toISOString()
@@ -4379,14 +4398,14 @@ const _pkTipGetter = {
 // altfel tipul piesei (CRAFTER/T6/ELEKTRO) trebuie să fie același cu al mașinii.
 function pkCompatible(st, tip){
   if(!st) return false;
-  const c=(st.compatibil||'').trim();
-  if(!c || c.toLowerCase()==='universal' || c.toUpperCase()==='ALTELE') return true;
+  const cl=compatList(st.compatibil).map(x=>x.toUpperCase());
+  if(!cl.length || cl.includes('UNIVERSAL') || cl.includes('ALTELE')) return true;
   if((st.categorie||'').toLowerCase()==='altele') return true;
   const mt=tip||'';
   if(!mt) return false;
   const known=['CRAFTER','T6','ELEKTRO'];
   const carKey = known.includes(mt)?mt:'ALTELE';
-  return c.toUpperCase()===carKey;
+  return cl.includes(carKey);
 }
 // Verifică piesele alese pentru mașina curentă; întoarce numele pieselor nepotrivite
 function pkMismatches(key){
@@ -4539,8 +4558,8 @@ function scadeStoc(descriere, masinaTip){
     // Verifică dacă descrierea conține numele piesei
     if(!desc.includes(s.nume.toLowerCase())) return;
     // Verifică compatibilitatea cu tipul mașinii
-    const compat = s.compatibil||'Universal';
-    if(compat==='Universal' || !masinaTip || compat===masinaTip){
+    const cl = compatList(s.compatibil).map(x=>x.toUpperCase());
+    if(!cl.length || cl.includes('UNIVERSAL') || !masinaTip || cl.includes(String(masinaTip).toUpperCase())){
       s.cantitate=Math.max(0,s.cantitate-1);
       changed=true;
     }
@@ -4693,6 +4712,124 @@ function renderFlotaBackupList(){
     '<div style="margin-top:14px"><button class="btn" onclick="flotaBackupRestoreFromFile()" style="flex:none;width:auto">⬆ Restaurează din fișier</button></div>';
 }
 
+
+// ── MANAGER BACKUP PE MODULE (3 pe zi în Cloud Storage; restaurare pe modul sau pe un singur element) ──
+const BKM={runs:[],cfg:null,runId:null,scope:null,list:[],plan:null};
+const bkmLabels={auto:'automat',manual:'manual','pre-restore':'înainte de restaurare'};
+const bkmEsc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const bkmWhen=iso=>new Date(iso).toLocaleString('ro-RO',{timeZone:'Europe/Berlin',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+const bkmDay=iso=>new Date(iso).toLocaleDateString('ro-RO',{timeZone:'Europe/Berlin',weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+const bkmTime=iso=>new Date(iso).toLocaleTimeString('ro-RO',{timeZone:'Europe/Berlin',hour:'2-digit',minute:'2-digit'});
+const BKM_B='style="text-align:left;padding:12px;width:100%;flex:none"';
+const BKM_S='style="width:auto;flex:none"';
+function bkmShow(html){ document.getElementById('bkm-body').innerHTML=html; document.getElementById('bkm-modal').classList.add('open'); }
+function bkmClose(){ document.getElementById('bkm-modal').classList.remove('open'); }
+function bkmErr(e){ return '<div style="padding:10px;border:1px solid var(--danger);border-radius:8px;font-size:13px;color:var(--danger)">'+bkmEsc(e&&e.message||e)+'</div>'; }
+const bkmBack=to=>'<button class="btn" '+BKM_S+' onclick="'+to+'">← Înapoi</button>';
+async function bkmOpen(){
+  if(!isAdminUser) return;
+  bkmShow('<div style="color:var(--text2);font-size:13px">Se încarcă lista de backup-uri...</div>');
+  try{ const r=await window.fbCall('backupList',{}); BKM.runs=r.runs||[]; BKM.cfg=r.config; bkmRenderRuns(); }
+  catch(e){ bkmShow(bkmErr(e)+'<div style="font-size:12.5px;color:var(--text2);margin-top:10px">Dacă e prima dată: funcțiile de backup trebuie publicate, iar bucket-ul creat (vezi instrucțiunile primite).</div><div class="modal-actions"><button class="btn" onclick="bkmClose()">Închide</button></div>'); }
+}
+function bkmRenderRuns(){
+  const days=new Map(); BKM.runs.forEach(r=>{ const d=bkmDay(r.createdAt); if(!days.has(d)) days.set(d,[]); days.get(d).push(r); });
+  const sum=c=>Object.entries(c||{}).filter(([k,v])=>v>0).map(([k,v])=>v+' '+((BKM.cfg.modules.find(m=>m.id===k)||{}).label||k).toLowerCase()).join(' · ');
+  const body=BKM.runs.length?Array.from(days.entries()).map(([d,list])=>
+    '<div style="font-size:12px;font-weight:700;color:var(--text2);margin:12px 0 4px;text-transform:capitalize">'+bkmEsc(d)+'</div>'+
+    list.map(r=>'<div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--border2);border-radius:8px;margin-bottom:5px">'+
+      '<div style="min-width:48px;font-weight:700">'+bkmEsc(bkmTime(r.createdAt))+'</div>'+
+      '<div style="flex:1;min-width:0;font-size:12px;color:var(--text2)"><span style="font-weight:600;color:var(--text)">'+bkmEsc(bkmLabels[r.label]||r.label)+'</span>'+
+        (r.skipped&&Object.keys(r.skipped).length?' <span style="color:var(--danger)">⚠ module sărite</span>':'')+'<br>'+bkmEsc(sum(r.counts))+'</div>'+
+      '<button class="btn btn-primary" style="width:auto;flex:none;padding:6px 14px" onclick="bkmPick(\''+bkmEsc(r.id)+'\')">Alege</button></div>').join('')
+  ).join(''):'<div style="font-size:13px;color:var(--text2);padding:12px 0">Încă nu există backup-uri. Apasă „Fă backup acum”.</div>';
+  bkmShow('<div style="font-size:12.5px;color:var(--text2);margin-bottom:10px">Se face automat la 06:00, 14:00 și 22:00. Se păstrează toate copiile 14 zile, apoi câte una pe zi până la '+BKM.cfg.retention.dailyDays+' de zile. Înainte de orice restaurare se face automat o copie a stării de acum. Restaurează când nu lucrează nimeni în aplicație.</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" id="bkm-now" '+BKM_S+' onclick="bkmNow()">Fă backup acum</button><button class="btn" id="bkm-mail" '+BKM_S+' onclick="bkmTestMail()">✉ Trimite email de test</button></div>'+
+    '<div style="max-height:46vh;overflow-y:auto;margin-top:6px">'+body+'</div>'+
+    '<div class="modal-actions"><button class="btn" onclick="bkmClose()">Închide</button></div>');
+}
+async function bkmNow(){
+  const b=document.getElementById('bkm-now'); if(b){ b.disabled=true; b.textContent='Se face backup...'; }
+  try{ await window.fbCall('backupRunNow',{}); toast('Backup făcut'); bkmOpen(); }
+  catch(e){ if(b){ b.disabled=false; b.textContent='Fă backup acum'; } toast('Eroare: '+(e.message||e)); }
+}
+async function bkmTestMail(){
+  const b=document.getElementById('bkm-mail'); if(b){ b.disabled=true; b.textContent='Se trimite...'; }
+  try{ await window.fbCall('backupTestAlert',{}); toast('Email de test trimis. Verifică inbox-ul.'); }
+  catch(e){ toast('Eroare: '+(e.message||e)); }
+  if(b){ b.disabled=false; b.textContent='✉ Trimite email de test'; }
+}
+function bkmPick(id){
+  BKM.runId=id; const r=BKM.runs.find(x=>x.id===id); const quick=BKM.cfg.quick||[];
+  bkmShow('<div style="font-size:13px;margin-bottom:12px">Backup din <b>'+bkmEsc(bkmWhen(r.createdAt))+'</b> ('+bkmEsc(bkmLabels[r.label]||r.label)+'). Ce vrei să restaurezi?</div>'+
+    '<div style="display:grid;gap:8px">'+
+    '<button class="btn" '+BKM_B+' onclick="bkmStartModule()"><b>📦 Un modul sau un singur element</b><br><span style="font-size:12px;color:var(--text2)">Mașini, șoferi, log, reparații, sarcini, stoc piese, garanții: tot modulul sau doar anumite elemente (o mașină, o reparație, un rând din log).</span></button>'+
+    quick.map((q,i)=>'<button class="btn" '+BKM_B+' onclick="bkmQuick('+i+')"><b>🔗 '+bkmEsc(q.label)+'</b><br><span style="font-size:12px;color:var(--text2)">'+bkmEsc(q.hint)+'</span></button>').join('')+
+    '</div><div class="modal-actions">'+bkmBack('bkmRenderRuns()')+'</div>');
+}
+function bkmQuick(i){ bkmPreview({multi:BKM.cfg.quick[i].multi}); }
+function bkmFilter(){ const q=(document.getElementById('bkm-q').value||'').toLowerCase(); document.querySelectorAll('#bkm-list [data-l]').forEach(el=>{ el.style.display=el.dataset.l.includes(q)?'flex':'none'; }); }
+function bkmListHtml(){
+  return '<input id="bkm-q" placeholder="Caută..." oninput="bkmFilter()" class="login-input" style="margin-bottom:8px">'+
+    '<div id="bkm-list" style="max-height:36vh;overflow-y:auto;border:1px solid var(--border2);border-radius:8px">'+
+    BKM.list.map((x,i)=>'<label data-l="'+bkmEsc((x.label||'').toLowerCase())+'" style="display:flex;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border2);cursor:pointer;font-size:13px"><input type="checkbox" name="bkm-sel" value="'+i+'"> <span>'+bkmEsc(x.label)+'</span></label>').join('')+'</div>';
+}
+function bkmStartModule(){
+  bkmShow('<div style="margin-bottom:12px"><div class="login-label">Modul</div><select id="bkm-mod" class="login-input" onchange="bkmModChanged()">'+BKM.cfg.modules.map(m=>'<option value="'+bkmEsc(m.id)+'">'+bkmEsc(m.label)+'</option>').join('')+'</select><div id="bkm-hint" style="font-size:12px;color:var(--text2);margin-top:4px"></div></div>'+
+    '<div style="margin-bottom:12px"><div class="login-label">Ce restaurezi din el</div><select id="bkm-mode" class="login-input" onchange="bkmModeChanged()"></select></div>'+
+    '<div id="bkm-items"></div>'+
+    '<div class="modal-actions">'+bkmBack('bkmPick(BKM.runId)')+'<button class="btn btn-primary" '+BKM_S+' onclick="bkmGoModule()">Previzualizează</button></div>');
+  bkmModChanged();
+}
+function bkmModChanged(){
+  const m=BKM.cfg.modules.find(x=>x.id===document.getElementById('bkm-mod').value);
+  document.getElementById('bkm-hint').textContent=m.hint||'';
+  document.getElementById('bkm-mode').innerHTML='<option value="all">Tot modulul (toate elementele)</option>'+(m.items!==false?'<option value="items">Doar anumite elemente</option>':'')+m.fieldsets.map(f=>'<option value="fs:'+bkmEsc(f.id)+'">'+bkmEsc(f.label)+'</option>').join('');
+  document.getElementById('bkm-items').innerHTML='';
+}
+async function bkmModeChanged(){
+  const box=document.getElementById('bkm-items');
+  if(document.getElementById('bkm-mode').value!=='items'){ box.innerHTML=''; return; }
+  box.innerHTML='<div style="color:var(--text2);font-size:13px">Se încarcă...</div>';
+  try{ const r=await window.fbCall('backupItems',{runId:BKM.runId,moduleId:document.getElementById('bkm-mod').value}); BKM.list=r.items; box.innerHTML=bkmListHtml(); }
+  catch(e){ box.innerHTML=bkmErr(e); }
+}
+function bkmGoModule(){
+  const mod=document.getElementById('bkm-mod').value, mode=document.getElementById('bkm-mode').value;
+  if(mode==='all') return bkmPreview({module:mod,mode:'all'});
+  if(mode.startsWith('fs:')) return bkmPreview({module:mod,mode:'fieldset',fieldset:mode.slice(3)});
+  const sel=Array.from(document.querySelectorAll('input[name="bkm-sel"]:checked')).map(i=>BKM.list[+i.value]);
+  if(!sel.length){ toast('Alege cel puțin un element'); return; }
+  bkmPreview({module:mod,mode:'items',ids:sel.map(x=>({c:x.c,id:x.id}))});
+}
+async function bkmPreview(scope){
+  BKM.scope=scope; bkmShow('<div style="color:var(--text2);font-size:13px">Se compară backup-ul cu starea de acum...</div>');
+  try{
+    const p=await window.fbCall('backupPreview',{runId:BKM.runId,scope}); BKM.plan=p;
+    const s=p.summary, any=s.create+s.update+s.delete>0, act={create:'se recreează',update:'se modifică',delete:'se șterge',skip:'sărit'};
+    const rows=p.items.map(x=>'<div style="padding:8px 10px;border-bottom:1px solid var(--border2);font-size:12.5px"><b>'+bkmEsc(x.label)+'</b> <span style="color:var(--text2)">· '+bkmEsc(act[x.action]||x.action)+'</span>'+
+      (x.note?'<div style="color:var(--text2)">'+bkmEsc(x.note)+'</div>':'')+
+      (x.changes||[]).map(c=>'<div style="color:var(--text2);margin-top:2px"><code>'+bkmEsc(c.field)+'</code>: acum <b style="color:var(--text)">'+bkmEsc(c.current==null?'(gol)':c.current)+'</b> → în backup <b style="color:var(--accent)">'+bkmEsc(c.backup==null?'(gol)':c.backup)+'</b></div>').join('')+'</div>').join('');
+    bkmShow('<div style="font-size:13px;margin-bottom:10px">Din backup-ul <b>'+bkmEsc(bkmWhen(BKM.runs.find(x=>x.id===BKM.runId).createdAt))+'</b>:</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:12.5px"><span style="padding:3px 9px;border-radius:6px;background:var(--surface2)">'+s.update+' de modificat</span><span style="padding:3px 9px;border-radius:6px;background:var(--surface2)">'+s.create+' de recreat</span><span style="padding:3px 9px;border-radius:6px;background:var(--surface2)">'+s.same+' identice</span>'+(s.skipped?'<span style="padding:3px 9px;border-radius:6px;background:var(--surface2)">'+s.skipped+' sărite</span>':'')+'</div>'+
+      (p.warnings.length?'<div style="padding:8px 10px;background:var(--surface2);border-radius:8px;font-size:12.5px;margin-bottom:10px">'+p.warnings.map(w=>'<div>⚠️ '+bkmEsc(w)+'</div>').join('')+'</div>':'')+
+      (rows?'<div style="max-height:34vh;overflow-y:auto;border:1px solid var(--border2);border-radius:8px">'+rows+'</div>':'<div style="font-size:13px;color:var(--text2)">Nu e nicio diferență: starea de acum e identică cu backup-ul.</div>')+
+      (p.truncated?'<div style="font-size:12px;color:var(--text2);margin-top:4px">Se afișează primele elemente; restaurarea le include pe toate.</div>':'')+
+      '<div style="font-size:12px;color:var(--text2);margin-top:12px">Înainte de restaurare se face automat un backup al stării de acum, ca să poți reveni. Se modifică doar câmpurile modulului ales; restul datelor rămân neatinse.</div>'+
+      '<div class="modal-actions">'+bkmBack('bkmPick(BKM.runId)')+(any?'<button class="btn btn-primary" id="bkm-go" style="background:var(--danger);border-color:var(--danger);width:auto;flex:none" onclick="bkmConfirm()">Restaurează</button>':'')+'</div>');
+  }catch(e){ bkmShow(bkmErr(e)+'<div class="modal-actions">'+bkmBack('bkmPick(BKM.runId)')+'</div>'); }
+}
+let _bkmArmed=false;
+async function bkmConfirm(){
+  const b=document.getElementById('bkm-go');
+  if(!_bkmArmed){ _bkmArmed=true; b.textContent='Apasă încă o dată pentru a confirma'; setTimeout(()=>{ _bkmArmed=false; const x=document.getElementById('bkm-go'); if(x) x.textContent='Restaurează'; },5000); return; }
+  _bkmArmed=false; b.disabled=true; b.textContent='Se restaurează...';
+  try{
+    const r=await window.fbCall('backupRestore',{runId:BKM.runId,scope:BKM.scope,confirm:true,deleteExtra:false}); const x=r.result;
+    bkmShow('<div style="font-size:14px;margin-bottom:8px">✅ Restaurare terminată.</div><div style="font-size:13px;color:var(--text2)">'+x.updated+' modificate · '+x.created+' recreate'+(x.skipped?' · '+x.skipped+' sărite':'')+'.<br>Starea de dinainte e salvată automat în backup-ul „înainte de restaurare”, deci poți reveni.</div><div class="modal-actions"><button class="btn btn-primary" '+BKM_S+' onclick="bkmOpen()">Gata</button></div>');
+  }catch(e){ bkmShow(bkmErr(e)+'<div class="modal-actions">'+bkmBack('bkmPick(BKM.runId)')+'</div>'); }
+}
+
 // ── MANAGER BACKUP (copii automate pe server, dimineața și seara) ──
 const BM={items:null,loading:false,err:'',filter:'all',restoreId:null};
 const BM_KINDS={'auto-dimineata':['🌅','Automat · dimineață'],'auto-seara':['🌙','Automat · seară'],'manual':['✋','Manual'],'inainte-de-restaurare':['🛟','Înainte de restaurare']};
@@ -4767,7 +4904,7 @@ function bmHtml(){
     hero=`<div class="bm-hero"><span class="bm-dot" style="background:${col}"></span>
       <div style="flex:1;min-width:200px"><div style="font-weight:500;font-size:15px">${head}</div><div style="font-size:12px;color:var(--text2);margin-top:3px">${sub}</div>
       <div style="font-size:11px;color:var(--text3);margin-top:3px">${items.length} backup-uri · ${(tot/1024).toFixed(0)} KB · automate la 06:00 și 20:00, păstrate 60 de zile</div></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="bmCreate()" style="flex:none;width:auto">💾 Backup acum</button><button class="btn" onclick="bmLoad()" style="flex:none;width:auto" title="Reîncarcă lista">↻</button></div></div>`;
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="bmCreate()" style="flex:none;width:auto">💾 Backup acum</button><button class="btn" onclick="bkmOpen()" style="flex:none;width:auto" title="Backup pe module, 3 pe zi, restaurare pe element">🧩 Manager pe module</button><button class="btn" onclick="bmLoad()" style="flex:none;width:auto" title="Reîncarcă lista">↻</button></div></div>`;
   }
   let list='';
   if(items){
@@ -6880,7 +7017,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261030-112228';
+const APP_VERSION='20261030-225208';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
