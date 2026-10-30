@@ -4400,8 +4400,7 @@ function pkCompatible(st, tip){
   if(!st) return false;
   const cl=compatList(st.compatibil).map(x=>x.toUpperCase());
   if(!cl.length || cl.includes('UNIVERSAL') || cl.includes('ALTELE')) return true;
-  if((st.categorie||'').toLowerCase()==='altele') return true;
-  const mt=tip||'';
+  const mt=String(tip||'').trim().toUpperCase();
   if(!mt) return false;
   const known=['CRAFTER','T6','ELEKTRO'];
   const carKey = known.includes(mt)?mt:'ALTELE';
@@ -7017,7 +7016,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261030-225208';
+const APP_VERSION='20261030-230757';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
