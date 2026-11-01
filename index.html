@@ -426,7 +426,6 @@ body.user-mode .log-mobile-card {
   .srvm-add summary{font-size:15px;padding:10px 0;}
 }
 }
-.stoc-cp{display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;user-select:none}.stoc-cp input{width:auto;margin:0}
 </style>
 </head>
 <body>
@@ -1311,14 +1310,13 @@ body.user-mode .log-mobile-card {
       </div>
       <div class="modal-field">
         <div class="modal-label">Tip mașină</div>
-        <div id="stoc-new-compat" style="display:flex;flex-wrap:wrap;gap:8px">
-          <label class="stoc-cp"><input type="checkbox" value="CRAFTER"> CRAFTER</label>
-          <label class="stoc-cp"><input type="checkbox" value="T6"> T6</label>
-          <label class="stoc-cp"><input type="checkbox" value="ELEKTRO"> ELEKTRO</label>
-          <label class="stoc-cp"><input type="checkbox" value="ALTELE"> ALTELE</label>
-          <label class="stoc-cp"><input type="checkbox" value="Universal"> Universal (toate)</label>
-        </div>
-        <div style="font-size:11px;color:var(--text3);margin-top:4px">Poți bifa mai multe tipuri (ex: CRAFTER + ELEKTRO).</div>
+        <select id="stoc-new-compat">
+          <option value="CRAFTER">CRAFTER</option>
+          <option value="T6">T6</option>
+          <option value="ELEKTRO">ELEKTRO</option>
+          <option value="ALTELE">ALTELE</option>
+          <option value="Universal">Universal (toate)</option>
+        </select>
       </div>
     </div>
     <div id="stoc-tire-fields" style="display:none;grid-template-columns:1fr 1fr;gap:10px">
@@ -4122,7 +4120,8 @@ function renderStoc(){
   sec.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">'+
     list.map(s=>{
       const cantColor=s.cantitate===0?'var(--danger)':s.cantitate<=stocPrag(s)?'var(--t6)':'var(--accent)';
-      const tipChips = (compatList(s.compatibil).length?compatList(s.compatibil):['Universal']).map(t=>{const c=t.toUpperCase()==='CRAFTER'?'var(--crafter)':t.toUpperCase()==='T6'?'var(--t6)':'#888';return `<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;background:${c}22;color:${c};font-family:var(--mono)">${t}</span>`;}).join('');
+      const tipColor = s.compatibil==='CRAFTER'?'var(--crafter)':s.compatibil==='T6'?'var(--t6)':'#888';
+      const tipLabel = s.compatibil||'Universal';
       const editBtn=canEditStoc()?`<button class="icon-btn" onclick="stocOpenEdit(${s.id})">✎</button>`:'';
       return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
@@ -4132,7 +4131,7 @@ function renderStoc(){
               ${s.marime?`<span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:3px;background:rgba(18,24,38,.08);color:var(--text);font-family:var(--mono)">⭕ ${s.marime}</span>`:''}
               ${s.sezon?`<span style="font-size:10px;padding:2px 7px;border-radius:3px;background:rgba(100,100,100,.1);color:var(--text2)">${s.sezon}</span>`:''}
               ${s.owner?`<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;background:rgba(74,158,255,.12);color:#2f7fd6">${s.owner==='ion-srv'?'Ioan':s.owner==='vasile-srv'?'Vasile':s.owner}</span>`:'<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;background:rgba(255,159,74,.15);color:var(--t6)">nealocat — alege stocul</span>'}
-              ${tipChips}
+              <span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;background:${tipColor}22;color:${tipColor};font-family:var(--mono)">${tipLabel}</span>
               ${s.aniCompatibili?`<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;background:rgba(100,100,100,.1);color:var(--text2);font-family:var(--mono)">${s.aniCompatibili}</span>`:''}
               <span style="font-size:11px;color:var(--text3)">${s.categorie||'—'}</span>
             </div>
@@ -4150,16 +4149,6 @@ function renderStoc(){
     }).join('')+'</div>';
 }
 
-function compatList(v){return String(v||'').split(/[,;+\/]+/).map(x=>x.trim()).filter(Boolean);}
-function stocSetCompat(v){
-  const l=compatList(v).map(x=>x.toUpperCase());
-  document.querySelectorAll('#stoc-new-compat input').forEach(c=>{c.checked=l.includes(c.value.toUpperCase());});
-}
-function stocGetCompat(){
-  const l=[...document.querySelectorAll('#stoc-new-compat input:checked')].map(c=>c.value);
-  if(l.includes('Universal')) return 'Universal';
-  return l.join(', ')||null;
-}
 function stocOpenAdd(){
   if(!canEditStoc()){toast('Nu ai drept să adaugi piese');return;}
   editingStocId=null;
@@ -4167,7 +4156,7 @@ function stocOpenAdd(){
   document.getElementById('stoc-delete-btn').style.display='none';
   ['stoc-new-nume','stoc-new-cant','stoc-new-pret','stoc-new-cod','stoc-new-ani'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('stoc-new-cat').value='Filtre';
-  stocSetCompat('CRAFTER');
+  document.getElementById('stoc-new-compat').value='CRAFTER';
   document.getElementById('stoc-new-marime').value=''; document.getElementById('stoc-new-sezon').value='';
   document.getElementById('stoc-new-comun').checked=false;
   const _mu=['ion-srv','vasile-srv'];
@@ -4186,7 +4175,7 @@ function stocOpenEdit(id){
   document.getElementById('stoc-new-cat').value=s.categorie||'Filtre';
   document.getElementById('stoc-new-cant').value=s.cantitate||0;
   document.getElementById('stoc-new-pret').value=s.pret||'';
-  stocSetCompat(s.compatibil||'CRAFTER');
+  document.getElementById('stoc-new-compat').value=s.compatibil||'CRAFTER';
   document.getElementById('stoc-new-cod').value=s.cod||'';
   document.getElementById('stoc-new-ani').value=s.aniCompatibili||'';
   document.getElementById('stoc-new-marime').value=s.marime||''; document.getElementById('stoc-new-sezon').value=s.sezon||'';
@@ -4216,7 +4205,7 @@ function stocSave(){
     categorie:document.getElementById('stoc-new-cat').value,
     cantitate:parseInt(document.getElementById('stoc-new-cant').value)||0,
     pret:parseFloat(document.getElementById('stoc-new-pret').value)||null,
-    compatibil:stocGetCompat(),
+    compatibil:document.getElementById('stoc-new-compat').value.trim()||null,
     cod:document.getElementById('stoc-new-cod').value.trim()||null,
     aniCompatibili:document.getElementById('stoc-new-ani').value.trim()||null,
     addedAt:new Date().toISOString()
@@ -4398,13 +4387,14 @@ const _pkTipGetter = {
 // altfel tipul piesei (CRAFTER/T6/ELEKTRO) trebuie să fie același cu al mașinii.
 function pkCompatible(st, tip){
   if(!st) return false;
-  const cl=compatList(st.compatibil).map(x=>x.toUpperCase());
-  if(!cl.length || cl.includes('UNIVERSAL') || cl.includes('ALTELE')) return true;
-  const mt=String(tip||'').trim().toUpperCase();
+  const c=(st.compatibil||'').trim();
+  if(!c || c.toLowerCase()==='universal' || c.toUpperCase()==='ALTELE') return true;
+  if((st.categorie||'').toLowerCase()==='altele') return true;
+  const mt=tip||'';
   if(!mt) return false;
   const known=['CRAFTER','T6','ELEKTRO'];
   const carKey = known.includes(mt)?mt:'ALTELE';
-  return cl.includes(carKey);
+  return c.toUpperCase()===carKey;
 }
 // Verifică piesele alese pentru mașina curentă; întoarce numele pieselor nepotrivite
 function pkMismatches(key){
@@ -4557,8 +4547,8 @@ function scadeStoc(descriere, masinaTip){
     // Verifică dacă descrierea conține numele piesei
     if(!desc.includes(s.nume.toLowerCase())) return;
     // Verifică compatibilitatea cu tipul mașinii
-    const cl = compatList(s.compatibil).map(x=>x.toUpperCase());
-    if(!cl.length || cl.includes('UNIVERSAL') || !masinaTip || cl.includes(String(masinaTip).toUpperCase())){
+    const compat = s.compatibil||'Universal';
+    if(compat==='Universal' || !masinaTip || compat===masinaTip){
       s.cantitate=Math.max(0,s.cantitate-1);
       changed=true;
     }
@@ -7016,7 +7006,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261030-230757';
+const APP_VERSION='20261030-162600';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
