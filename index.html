@@ -703,7 +703,8 @@ body.user-mode .log-mobile-card {
       <div class="settings-title">Despre</div>
       <div style="font-size:13px;color:var(--text2);line-height:1.7">
         Conectat ca: <strong style="color:var(--text)" id="info-email">—</strong><br>
-        Status sincronizare: <strong style="color:var(--accent)" id="info-sync">activ</strong>
+        Status sincronizare: <strong style="color:var(--accent)" id="info-sync">activ</strong><br>
+        Dimensiune document flotă: <strong style="color:var(--text)" id="info-docsize">—</strong>
       </div>
     </div>
   </div>
@@ -2281,7 +2282,14 @@ function startSync(){
   });
 }
 
+function setDocSizeInfo(obj){   // dimensiune estimată (JSON) a documentului principal față de limita Firestore de 1 MB
+  try{ const el=document.getElementById('info-docsize'); if(!el) return; const sz=JSON.stringify(obj).length;
+    const parts=Object.keys(obj).map(k=>[k,JSON.stringify(obj[k]).length]).sort((a,b)=>b[1]-a[1]).slice(0,4).map(x=>x[0]+' '+Math.round(x[1]/1024)+' KB').join(' · ');
+    const pct=Math.round(sz/1048576*100); el.style.color=pct>=85?'var(--danger)':pct>=65?'#f59e0b':'var(--accent)';
+    el.textContent=Math.round(sz/1024)+' KB din 1024 KB ('+pct+'%) — cele mai mari: '+parts; }catch(e){}
+}
 function hydrateFromCloud(d){
+  setDocSizeInfo(d);
   masini = (d.masini||[]).map(m=>({...m}));
 
   // Migrare șoferi: dacă sunt string-uri (format vechi), convertesc la obiecte
@@ -7037,7 +7045,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261106-125551';
+const APP_VERSION='20261106-130242';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
