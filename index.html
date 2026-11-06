@@ -923,6 +923,7 @@ body.user-mode .log-mobile-card {
   <button class="tab-btn" onclick="showSrvTab('masini')">Mașini</button>
   <button class="tab-btn" onclick="showSrvTab('istoric')">Istoric</button>
   <button class="tab-btn" onclick="showSrvTab('stoc')">🔩 Stoc</button>
+  <button class="tab-btn" onclick="showSrvTab('tuv')">🛂 TÜV</button>
   <button class="tab-btn" onclick="showSrvTab('garantie')">🛡 Garanție</button>
   <button class="tab-btn" id="srv-tab-btn-backup" onclick="showSrvTab('backup')" style="display:none">💾 Backup</button>
   <button class="tab-btn" id="srv-tab-btn-admin" onclick="showSrvTab('admin')" style="display:none">⚙ Admin</button>
@@ -1017,6 +1018,13 @@ body.user-mode .log-mobile-card {
   </div>
 
   <!-- Tab Stoc piese -->
+  <div id="srv-tab-tuv" style="display:none">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+      <div style="font-size:13px;color:var(--text2);flex:1;min-width:200px">Data de expirare a TÜV pentru fiecare mașină. Primești mail înainte de expirare (perioadele se setează la 🔔).</div>
+      <button class="filter-btn" id="tuv-alert-btn" onclick="stocAlertOpen()" style="display:none">🔔 Alertă mail TÜV</button>
+    </div>
+    <div id="tuv-section"></div>
+  </div>
   <div id="srv-tab-stoc" style="display:none">
     <div id="stoc-owner-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
@@ -1033,6 +1041,7 @@ body.user-mode .log-mobile-card {
         <option value="Altele">Altele</option>
       </select>
       <button class="btn-add-log" id="stoc-add-btn" onclick="stocOpenAdd()">+ Piesă nouă</button>
+      <button class="filter-btn" id="stoc-pret-btn" onclick="stocPretReview()" style="display:none;border-color:#d68a00;color:#b45309">💶 Verifică prețuri vechi</button>
       <button class="filter-btn" onclick="stocLogOpen()" title="Istoric mișcări stoc">📜 Istoric stoc</button>
       <button class="filter-btn" id="stoc-alert-btn" onclick="stocAlertOpen()" title="Alertă pe mail când stocul e scăzut" style="display:none">🔔 Alertă mail</button>
     </div>
@@ -1253,6 +1262,12 @@ body.user-mode .log-mobile-card {
       <div class="modal-field"><div class="modal-label">Filtre</div><input id="sa-filtre" type="number" min="0" inputmode="numeric"></div>
       <div class="modal-field"><div class="modal-label">Alte piese</div><input id="sa-altele" type="number" min="0" inputmode="numeric"></div>
     </div>
+    <div class="modal-label" style="margin-top:10px">🛂 Alertă TÜV (același mail)</div>
+    <div class="modal-field" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="sa-tuv-activ" style="width:18px;height:18px"> <b>Alertă TÜV activă</b></label>
+    </div>
+    <div class="modal-field"><div class="modal-label">Cu câte zile înainte de expirare (separate prin virgulă)</div><input id="sa-tuv-zile" type="text" placeholder="ex: 30, 14, 7, 1"></div>
+    <div style="font-size:11px;color:var(--text3);margin:2px 0 10px">După expirare mai primești un memento o dată pe săptămână, cât timp data nu e actualizată. Mail zilnic la 07:00, doar dacă e ceva de anunțat.</div>
     <div style="font-size:11px;color:var(--text3);margin:2px 0 10px">Pragul se aplică fiecărei piese în parte (ex: fiecare mărime de cauciuc). „Alte piese" = Ulei, Curea, Bujii, Lichide, Altele.</div>
     <div class="modal-actions">
       <button class="btn" onclick="stocAlertClose()">Anulează</button>
@@ -1262,6 +1277,23 @@ body.user-mode .log-mobile-card {
   </div>
 </div>
 
+<!-- Adăugare cantitate la o piesă existentă -->
+<div class="modal-overlay" id="srv-modal-stoc-qty" onclick="if(event.target===this)stocQtyClose()">
+  <div class="modal">
+    <div class="modal-title">➕ Adaugă cantitate</div>
+    <div id="sq-info" style="font-size:13px;margin-bottom:10px;line-height:1.5"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div class="modal-field"><div class="modal-label">Cantitate adăugată</div><input id="sq-cant" type="number" min="1" inputmode="numeric" oninput="stocQtyPreview()"></div>
+      <div class="modal-field"><div class="modal-label">Preț NET intrare (€)</div><input id="sq-net" type="number" step="0.01" inputmode="decimal" oninput="stocPretSync('net','sq-net','sq-brut');stocQtyPreview()"></div>
+      <div class="modal-field"><div class="modal-label">Preț BRUT intrare (€)</div><input id="sq-brut" type="number" step="0.01" inputmode="decimal" oninput="stocPretSync('brut','sq-net','sq-brut');stocQtyPreview()"></div>
+    </div>
+    <div id="sq-prev" style="font-size:12px;color:var(--text2);margin:4px 0 10px;line-height:1.5"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="stocQtyClose()">Anulează</button>
+      <button class="btn btn-primary" onclick="stocQtySave()">Adaugă în stoc</button>
+    </div>
+  </div>
+</div>
 <!-- Modal adăugare/editare piesă stoc -->
 <!-- Istoric stoc -->
 <div class="modal-overlay" id="srv-modal-stoc-log" onclick="if(event.target===this)stocLogClose()">
@@ -1357,8 +1389,12 @@ body.user-mode .log-mobile-card {
         <input id="stoc-new-cant" type="number" min="0" placeholder="0">
       </div>
       <div class="modal-field">
-        <div class="modal-label">Preț (€, opțional)</div>
-        <input id="stoc-new-pret" type="number" step="0.01" placeholder="0.00">
+        <div class="modal-label">Preț NET (€, opțional)</div>
+        <input id="stoc-new-pret" type="number" step="0.01" placeholder="0.00" oninput="stocPretSync('net','stoc-new-pret','stoc-new-brut')">
+      </div>
+      <div class="modal-field">
+        <div class="modal-label">Preț BRUT (€, cu TVA)</div>
+        <input id="stoc-new-brut" type="number" step="0.01" placeholder="0.00" oninput="stocPretSync('brut','stoc-new-pret','stoc-new-brut')">
       </div>
     </div>
     <div class="modal-actions">
@@ -4150,10 +4186,11 @@ function stocToggleTireFields(){
 }
 window.stocToggleTireFields=stocToggleTireFields;
 
-const STOC_ALERT_DEF={activ:true,email:'',praguri:{cauciucuri:10,placute:10,filtre:5,altele:2}};
+const STOC_ALERT_DEF={activ:true,email:'',praguri:{cauciucuri:10,placute:10,filtre:5,altele:2},tuvActiv:true,tuvZile:[30,14,7,1]};
+const STOC_TVA=19;   // cota de TVA (%) pentru calculul net ↔ brut
 function stocAlertCfg(){
   const a=stocAlert||{};
-  return {activ:a.activ!==false, email:a.email||'', praguri:{...STOC_ALERT_DEF.praguri,...(a.praguri||{})}};
+  return {activ:a.activ!==false, email:a.email||'', praguri:{...STOC_ALERT_DEF.praguri,...(a.praguri||{})}, tuvActiv:a.tuvActiv!==false, tuvZile:(Array.isArray(a.tuvZile)&&a.tuvZile.length)?a.tuvZile:STOC_ALERT_DEF.tuvZile};
 }
 // prag de alertă pentru o piesă (după categorie)
 function stocPrag(s){
@@ -4187,6 +4224,7 @@ function renderStoc(){
   try{ stocLogBackfill(); }catch(e){ console.warn('backfill stoc', e); }
   const alertBtn=document.getElementById('stoc-alert-btn');
   if(alertBtn) alertBtn.style.display=(canEditStoc()&&(isAdminUser||isSrvSef()))?'':'none';
+  const _pb=document.getElementById('stoc-pret-btn'); if(_pb){ const n=stoc.filter(x=>x.pret!=null&&!x.pn).length; _pb.style.display=(n&&isAdminUser)?'':'none'; _pb.textContent='💶 Verifică prețuri vechi ('+n+')'; }
   const addBtn = document.getElementById('stoc-add-btn');
   document.body.classList.toggle('stoc-editor', canEditStoc());
   if(addBtn) addBtn.style.display = canEditStoc() ? '' : 'none';
@@ -4236,8 +4274,9 @@ function renderStoc(){
         ${s.comun?`<div style="font-size:12px;color:var(--text2);margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">🧴 Consumabil comun · ${s.tubInceput?`tub început: <b>${new Date(s.tubInceput).toLocaleDateString('ro-RO')}</b> de ${s.tubInceputDe||'?'}`:'niciun tub început încă'} ${canEditStoc()?`<button class="btn" onclick="stocTubNou(${s.id})" style="flex:none;width:auto;padding:4px 10px;font-size:12px">▶ Început tub nou</button>`:''}</div>`:''}
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
           <div style="font-family:var(--mono);font-size:20px;font-weight:500;color:${cantColor}">${s.cantitate} <span style="font-size:12px;color:var(--text3)">${s.comun?'tuburi':'buc'}</span></div>
-          ${s.pret?`<div style="font-family:var(--mono);font-size:13px;color:var(--text2)" class="srv-cost-display">${Number(s.pret).toFixed(2)} €/${s.comun?'tub':'buc'}</div>`:''}
+          ${s.pret?`<div style="font-family:var(--mono);font-size:12px;color:var(--text2);text-align:right;line-height:1.35" class="srv-cost-display">net ${Number(s.pret).toFixed(2)} € · brut ${(Number(s.pret)*(1+STOC_TVA/100)).toFixed(2)} €<div style="font-size:10px;color:var(--text3)">/${s.comun?'tub':'buc'}${s.pn?'':' · ⚠ net presupus'}</div></div>`:''}
         </div>
+        ${canEditStoc()?`<button class="filter-btn" style="margin-top:8px;width:100%" onclick="stocQtyOpen(${s.id})">➕ Adaugă cantitate</button>`:''}
         ${s.cantitate===0?'<div style="font-size:11px;color:var(--danger);margin-top:6px">⚠ Stoc epuizat</div>':s.cantitate<=stocPrag(s)?'<div style="font-size:11px;color:var(--t6);margin-top:6px">⚠ Stoc scăzut (alertă la ≤ '+stocPrag(s)+')</div>':''}
       </div>`;
     }).join('')+'</div>';
@@ -4258,7 +4297,7 @@ function stocOpenAdd(){
   editingStocId=null;
   document.getElementById('stoc-modal-title').textContent='Piesă nouă';
   document.getElementById('stoc-delete-btn').style.display='none';
-  ['stoc-new-nume','stoc-new-cant','stoc-new-pret','stoc-new-cod','stoc-new-ani'].forEach(id=>document.getElementById(id).value='');
+  ['stoc-new-nume','stoc-new-cant','stoc-new-pret','stoc-new-brut','stoc-new-cod','stoc-new-ani'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('stoc-new-cat').value='Filtre';
   stocSetCompat('CRAFTER');
   document.getElementById('stoc-new-marime').value=''; document.getElementById('stoc-new-sezon').value='';
@@ -4278,7 +4317,7 @@ function stocOpenEdit(id){
   document.getElementById('stoc-new-nume').value=s.nume||'';
   document.getElementById('stoc-new-cat').value=s.categorie||'Filtre';
   document.getElementById('stoc-new-cant').value=s.cantitate||0;
-  document.getElementById('stoc-new-pret').value=s.pret||'';
+  document.getElementById('stoc-new-pret').value=s.pret||''; stocPretSync('net','stoc-new-pret','stoc-new-brut');
   stocSetCompat(s.compatibil||'CRAFTER');
   document.getElementById('stoc-new-cod').value=s.cod||'';
   document.getElementById('stoc-new-ani').value=s.aniCompatibili||'';
@@ -4308,7 +4347,7 @@ function stocSave(){
     sezon:_cat==='Cauciucuri'?(document.getElementById('stoc-new-sezon').value||null):null,
     categorie:document.getElementById('stoc-new-cat').value,
     cantitate:parseInt(document.getElementById('stoc-new-cant').value)||0,
-    pret:parseFloat(document.getElementById('stoc-new-pret').value)||null,
+    pret:parseFloat(document.getElementById('stoc-new-pret').value)||null, pn:1,
     compatibil:stocGetCompat(),
     cod:document.getElementById('stoc-new-cod').value.trim()||null,
     aniCompatibili:document.getElementById('stoc-new-ani').value.trim()||null,
@@ -4319,7 +4358,7 @@ function stocSave(){
     if(idx>=0){
       const old=stoc[idx];
       obj.addedAt=old.addedAt||obj.addedAt;
-      obj.tubInceput=old.tubInceput; obj.tubInceputDe=old.tubInceputDe;
+      obj.tubInceput=old.tubInceput; obj.tubInceputDe=old.tubInceputDe; if(obj.pret==null||Math.abs((obj.pret||0)-(old.pret||0))<0.005) obj.pn=old.pn;
       const dq=obj.cantitate-(old.cantitate||0);
       const changed=['nume','categorie','pret','compatibil','cod','aniCompatibili','owner','marime','sezon'].filter(k=>(old[k]||null)!==(obj[k]||null));
       stoc[idx]=obj;
@@ -4420,6 +4459,7 @@ function stocAlertOpen(){
   document.getElementById('sa-activ').checked=c.activ;
   document.getElementById('sa-email').value=c.email;
   ['cauciucuri','placute','filtre','altele'].forEach(k=>document.getElementById('sa-'+k).value=c.praguri[k]);
+  document.getElementById('sa-tuv-activ').checked=c.tuvActiv; document.getElementById('sa-tuv-zile').value=c.tuvZile.join(', ');
   document.getElementById('srv-modal-stoc-alert').classList.add('open');
 }
 function stocAlertClose(){ document.getElementById('srv-modal-stoc-alert').classList.remove('open'); }
@@ -4433,7 +4473,10 @@ function stocAlertRead(){
     const v=parseInt(document.getElementById('sa-'+k).value);
     praguri[k]=isFinite(v)&&v>=0?v:STOC_ALERT_DEF.praguri[k];
   }
-  return {activ:document.getElementById('sa-activ').checked, email:list.join(', '), praguri};
+  const zl=document.getElementById('sa-tuv-zile').value.split(/[,;\s]+/).filter(Boolean).map(Number);
+  if(zl.some(n=>!Number.isInteger(n)||n<0||n>365)){toast('Zilele TÜV: numere întregi între 0 și 365');return null;}
+  const tuvZile=Array.from(new Set(zl)).sort((a,b)=>b-a);
+  return {activ:document.getElementById('sa-activ').checked, email:list.join(', '), praguri, tuvActiv:document.getElementById('sa-tuv-activ').checked, tuvZile:tuvZile.length?tuvZile:STOC_ALERT_DEF.tuvZile};
 }
 function stocAlertSave(){
   const v=stocAlertRead(); if(!v) return;
@@ -4450,7 +4493,7 @@ async function stocAlertTest(){
     const user=window.fbAuth.currentUser; if(!user) throw new Error('nu ești autentificat');
     const tok=await user.getIdToken();
     const pid=window.fbAuth.app.options.projectId;
-    const r=await fetch('https://europe-west1-'+pid+'.cloudfunctions.net/stocAlertTest',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({email:v.email,praguri:v.praguri})});
+    const r=await fetch('https://europe-west1-'+pid+'.cloudfunctions.net/stocAlertTest',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({email:v.email,praguri:v.praguri,tuvZile:v.tuvZile})});
     const j=await r.json().catch(()=>({}));
     if(!r.ok||!j.ok) throw new Error(j.error||('eroare '+r.status));
     toast('Mail de test trimis la '+v.email+' ('+j.low+' piese sub prag acum)');
@@ -4460,6 +4503,88 @@ async function stocAlertTest(){
   }finally{ btn.disabled=false; btn.textContent=old; }
 }
 window.stocAlertOpen=stocAlertOpen; window.stocAlertClose=stocAlertClose; window.stocAlertSave=stocAlertSave; window.stocAlertTest=stocAlertTest;
+
+// ── PREȚ NET / BRUT + ADĂUGARE CANTITATE (cost mediu ponderat) ──────────────
+function stocPretSync(from,netId,brutId){
+  const n=document.getElementById(netId), b=document.getElementById(brutId); if(!n||!b) return;
+  const k=1+STOC_TVA/100;
+  if(from==='net'){ const v=parseFloat(n.value); b.value=isFinite(v)&&n.value!==''?(Math.round(v*k*100)/100).toFixed(2):''; }
+  else { const v=parseFloat(b.value); n.value=isFinite(v)&&b.value!==''?(Math.round(v/k*100)/100).toFixed(2):''; }
+}
+let stocQtyId=null;
+function stocQtyOpen(id){
+  if(!canEditStoc()){toast('Nu ai drept să adaugi stoc');return;}
+  const s=stoc.find(x=>x.id===id); if(!s) return; stocQtyId=id;
+  const u=s.comun?'tuburi':'buc';
+  document.getElementById('sq-info').innerHTML='<b>'+pkEsc(s.nume)+(s.marime?' '+pkEsc(s.marime):'')+'</b><br>Acum în stoc: <b>'+(s.cantitate||0)+' '+u+'</b>'+(s.pret?' · cost mediu: <b>'+Number(s.pret).toFixed(2)+' € net</b> ('+(Number(s.pret)*(1+STOC_TVA/100)).toFixed(2)+' € brut)':'');
+  document.getElementById('sq-cant').value=''; document.getElementById('sq-net').value=s.pret?Number(s.pret).toFixed(2):''; document.getElementById('sq-brut').value='';
+  stocPretSync('net','sq-net','sq-brut'); stocQtyPreview();
+  document.getElementById('srv-modal-stoc-qty').classList.add('open');
+  setTimeout(()=>document.getElementById('sq-cant').focus(),50);
+}
+function stocQtyClose(){ document.getElementById('srv-modal-stoc-qty').classList.remove('open'); stocQtyId=null; }
+function stocQtyCalc(){
+  const s=stoc.find(x=>x.id===stocQtyId); if(!s) return null;
+  const q=parseInt(document.getElementById('sq-cant').value)||0, p=parseFloat(document.getElementById('sq-net').value);
+  const oldQ=Math.max(0,s.cantitate||0), oldP=Number(s.pret)||0, hasP=isFinite(p)&&p>0;
+  let nou=s.pret||null;
+  if(q>0&&hasP){ nou=(oldQ>0&&oldP>0)?Math.round(((oldQ*oldP+q*p)/(oldQ+q))*100)/100:p; }
+  return {s,q,p:hasP?p:null,oldQ,nou};
+}
+function stocQtyPreview(){
+  const c=stocQtyCalc(), el=document.getElementById('sq-prev'); if(!c||!el) return;
+  if(!c.q){ el.textContent=''; return; }
+  el.innerHTML='După adăugare: <b>'+(c.oldQ+c.q)+'</b> în stoc'+(c.nou&&c.p?' · cost mediu nou <b>'+c.nou.toFixed(2)+' € net</b> ('+(c.nou*(1+STOC_TVA/100)).toFixed(2)+' € brut)':'');
+}
+function stocQtySave(){
+  const c=stocQtyCalc(); if(!c) return;
+  if(c.q<1){toast('Scrie cantitatea adăugată');return;}
+  const s=c.s, oldQ=c.oldQ, oldP=s.pret;
+  s.cantitate=oldQ+c.q;
+  if(c.p){ s.ultimulPret=c.p; s.pret=c.nou; s.pn=1; }
+  stocLogAdd('adaugare', s, c.q, 'intrare +'+c.q+(c.p?' la '+c.p.toFixed(2)+' € net ('+(c.p*(1+STOC_TVA/100)).toFixed(2)+' € brut)':'')+((c.p&&oldP&&Math.abs(oldP-s.pret)>=0.005)?' · cost mediu '+Number(oldP).toFixed(2)+' → '+s.pret.toFixed(2)+' € net':''));
+  stocQtyClose(); saveToCloud(); renderStoc(); toast('Adăugat +'+c.q+' la '+(s.nume||'piesă'));
+}
+function stocPretReview(){
+  if(!isAdminUser) return;
+  const old=stoc.filter(x=>x.pret!=null&&!x.pn); if(!old.length){toast('Nu sunt prețuri de verificat');return;}
+  const k=1+STOC_TVA/100;
+  if(confirm(old.length+' piese au prețul introdus înainte de net/brut.\n\nOK = prețurile vechi sunt NETE (rămân cum sunt, se afișează și brutul).\nAnulează = vezi opțiunea următoare.')){
+    old.forEach(x=>{x.pn=1;}); saveToCloud(); renderStoc(); toast('Prețuri vechi confirmate ca NETE'); return;
+  }
+  if(confirm('Prețurile vechi sunt BRUTE (cu TVA '+STOC_TVA+'%)?\n\nOK = le transform în NET (împărțit la '+k.toFixed(2)+'). Costul reparațiilor deja finalizate nu se schimbă.\nAnulează = nu schimb nimic.')){
+    old.forEach(x=>{ x.pret=Math.round(x.pret/k*100)/100; x.pn=1; }); saveToCloud(); renderStoc(); toast('Prețuri vechi convertite din brut în net');
+  }
+}
+window.stocPretSync=stocPretSync; window.stocQtyOpen=stocQtyOpen; window.stocQtyClose=stocQtyClose; window.stocQtyPreview=stocQtyPreview; window.stocQtySave=stocQtySave; window.stocPretReview=stocPretReview;
+
+// ── TÜV: data de expirare pe fiecare mașină ──────────────────────────────────
+function tuvDays(m){ if(!m.tuv) return null; const a=new Date(m.tuv+'T00:00:00'), n=new Date(); n.setHours(0,0,0,0); return Math.round((a-n)/86400000); }
+function renderTuv(){
+  const sec=document.getElementById('tuv-section'); if(!sec) return;
+  const ab=document.getElementById('tuv-alert-btn'); if(ab) ab.style.display=(canEditStoc()&&(isAdminUser||isSrvSef()))?'':'none';
+  const ed=canEditStoc();
+  const list=masini.slice().sort((a,b)=>{ const da=tuvDays(a), db=tuvDays(b); if(da==null&&db==null) return (a.nr||'').localeCompare(b.nr||''); if(da==null) return 1; if(db==null) return -1; return da-db; });
+  if(!list.length){ sec.innerHTML='<div class="empty-state">Nicio mașină.</div>'; return; }
+  const zl=Math.max(...stocAlertCfg().tuvZile,30);
+  sec.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px">'+list.map(m=>{
+    const d=tuvDays(m); let col='var(--text3)', lbl='fără dată';
+    if(d!=null){ if(d<0){col='var(--danger)';lbl='EXPIRAT de '+(-d)+' zile';} else if(d===0){col='var(--danger)';lbl='expiră azi';} else if(d<=zl){col='var(--t6)';lbl='mai sunt '+d+' zile';} else {col='var(--accent)';lbl='mai sunt '+d+' zile';} }
+    const tipColor=m.tip==='CRAFTER'?'var(--crafter)':m.tip==='T6'?'var(--t6)':m.tip==='ELEKTRO'?'var(--elektro)':'#444';
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;position:relative;overflow:hidden"><div style="position:absolute;top:0;left:0;width:3px;height:100%;background:${tipColor}"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span class="tip-badge tip-${m.tip||'unknown'}">${m.tip||'?'}</span><span style="font-size:12px;font-weight:600;color:${col}">${lbl}</span></div>
+      <div style="font-family:var(--mono);font-size:15px;font-weight:500;margin-bottom:10px">${pkEsc(m.nr)}</div>
+      <div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--text2)">TÜV valabil până la</span>
+      <input type="date" value="${m.tuv||''}" ${ed?'':'disabled'} onchange="tuvSet(${m.id},this.value)" style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-family:var(--mono)"></div></div>`;
+  }).join('')+'</div>';
+}
+function tuvSet(id,v){
+  if(!canEditStoc()){toast('Nu ai drept să modifici TÜV');renderTuv();return;}
+  const m=masini.find(x=>x.id===id); if(!m) return;
+  if(v) m.tuv=v; else delete m.tuv;
+  saveToCloud(); renderTuv(); toast(v?'TÜV salvat pentru '+m.nr:'Data TÜV ștearsă');
+}
+window.renderTuv=renderTuv; window.tuvSet=tuvSet;
 
 function stocDelete(){
   if(!isAdminUser||!editingStocId)return;
@@ -6011,19 +6136,20 @@ function srvRefreshAfterCost(){
 
 function showSrvTab(name){
   if(name==='active') name='taskuri';   // tabul „Reparații active" a fost scos; reparațiile în curs apar în Sarcini
-  ['taskuri','istoric','adauga','masini','stoc','garantie','backup','admin'].forEach(t=>{
+  ['taskuri','istoric','adauga','masini','stoc','tuv','garantie','backup','admin'].forEach(t=>{
     const el=document.getElementById('srv-tab-'+t);
     if(el) el.style.display=t===name?'':'none';
   });
   const btns = document.querySelectorAll('#app-service .tab-btn');
   btns.forEach(b=>b.classList.remove('active'));
-  const idx = ['taskuri','adauga','masini','istoric','stoc','garantie','backup','admin'].indexOf(name);
+  const idx = ['taskuri','adauga','masini','istoric','stoc','tuv','garantie','backup','admin'].indexOf(name);
   if(idx>=0 && btns[idx]) btns[idx].classList.add('active');
   if(name==='taskuri'){ updateSrvAdminUI(); renderSrvTaskuri(); renderSrvActive(); }
   if(name==='istoric') renderSrvIstoric();
   if(name==='adauga') renderSrvAdauga();
   if(name==='masini') renderSrvMasini();
   if(name==='stoc') renderStoc();
+  if(name==='tuv') renderTuv();
   if(name==='garantie') renderGarantie();
   if(name==='backup'){ renderBackupList(); }
   if(name==='admin') renderSrvAdmin();
@@ -7115,7 +7241,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261106-131636';
+const APP_VERSION='20261106-141928';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
