@@ -426,6 +426,7 @@ body.user-mode .log-mobile-card {
   .srvm-add summary{font-size:15px;padding:10px 0;}
 }
 }
+.stoc-cp{display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;user-select:none}.stoc-cp input{width:auto;margin:0}
 </style>
 </head>
 <body>
@@ -1310,13 +1311,14 @@ body.user-mode .log-mobile-card {
       </div>
       <div class="modal-field">
         <div class="modal-label">Tip mașină</div>
-        <select id="stoc-new-compat">
-          <option value="CRAFTER">CRAFTER</option>
-          <option value="T6">T6</option>
-          <option value="ELEKTRO">ELEKTRO</option>
-          <option value="ALTELE">ALTELE</option>
-          <option value="Universal">Universal (toate)</option>
-        </select>
+        <div id="stoc-new-compat" style="display:flex;flex-wrap:wrap;gap:8px">
+          <label class="stoc-cp"><input type="checkbox" value="CRAFTER"> CRAFTER</label>
+          <label class="stoc-cp"><input type="checkbox" value="T6"> T6</label>
+          <label class="stoc-cp"><input type="checkbox" value="ELEKTRO"> ELEKTRO</label>
+          <label class="stoc-cp"><input type="checkbox" value="ALTELE"> ALTELE</label>
+          <label class="stoc-cp"><input type="checkbox" value="Universal"> Universal (toate)</label>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">Poți bifa mai multe tipuri (ex: CRAFTER + ELEKTRO).</div>
       </div>
     </div>
     <div id="stoc-tire-fields" style="display:none;grid-template-columns:1fr 1fr;gap:10px">
@@ -2730,6 +2732,14 @@ window.mergeSetDoc=async function(ref, payload){
   _setBaseline(nb);
 };
 
+let _saveFailed=false, _saveBannerKind='';
+function _saveBanner(msg,kind){
+  let b=document.getElementById('save-fail-banner');
+  if(!msg){ if(b) b.remove(); _saveBannerKind=''; return; }
+  if(!b){ b=document.createElement('div'); b.id='save-fail-banner'; b.style.cssText='position:fixed;left:0;right:0;top:0;z-index:99999;background:#b91c1c;color:#fff;padding:10px 14px;font-size:13px;font-weight:600;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.4)'; document.body.appendChild(b); }
+  b.textContent=msg; _saveBannerKind=kind||'warn';
+}
+window.addEventListener('beforeunload',e=>{ if(savePending||isSaving||_saveFailed){ e.preventDefault(); e.returnValue=''; } });
 let savePending=false;
 let _saveRetryTimer=null;
 let saveTimer=null;
@@ -2738,6 +2748,7 @@ function saveToCloud(){
   // (înseamnă că ceva a mers prost cu datele în memorie)
   if(masini.length === 0 && (soferi.length > 0 || log.length > 0 || reparatii.length > 0)){
     console.warn('PROTECȚIE: saveToCloud blocat — masini goale cu alte date existente');
+    _saveFailed=true; _saveBanner('❌ Salvarea a fost BLOCATĂ (lista de mașini apare goală în memorie). Reîncarcă pagina (Ctrl+F5) înainte să mai introduci ceva.','fail');
     return;
   }
   clearTimeout(saveTimer);
@@ -2776,11 +2787,14 @@ function saveToCloud(){
       lastModifiedAt: new Date().toISOString()
     };
     try{
+      { const _sz=JSON.stringify(window._noUndef(payload)).length; if(_sz>900000) _saveBanner('⚠ Documentul flotei are '+Math.round(_sz/1024)+' KB și se apropie de limita Firestore (1024 KB). Anunță adminul — la limită, salvările vor începe să eșueze.'); }
       await window.fbHelpers.setDoc(window.fbDocRef, window._noUndef(payload));
-      isSaving=false;
+      isSaving=false; _saveFailed=false; if(_saveBannerKind==='fail') _saveBanner(null);
+      if(window._toastOnSave){ window._toastOnSave=false; toast('✓ Salvat în cloud'); }
     } catch(e){
       console.error('Save failed:', e);
-      isSaving=false;
+      isSaving=false; _saveFailed=true;
+      _saveBanner('❌ Modificările NU sunt salvate ('+((e&&e.message)||'eroare')+'). NU închide pagina — se reîncearcă automat. Dacă rămâne așa, anunță adminul.','fail');
       const offline = !navigator.onLine || /offline|unavailable|network/i.test(e.message||'');
       toast(offline ? 'Fără conexiune — salvarea se reia automat' : 'Salvare eșuată — '+e.message+' (reîncerc)');
       clearTimeout(_saveRetryTimer);
@@ -4120,8 +4134,7 @@ function renderStoc(){
   sec.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">'+
     list.map(s=>{
       const cantColor=s.cantitate===0?'var(--danger)':s.cantitate<=stocPrag(s)?'var(--t6)':'var(--accent)';
-      const tipColor = s.compatibil==='CRAFTER'?'var(--crafter)':s.compatibil==='T6'?'var(--t6)':'#888';
-      const tipLabel = s.compatibil||'Universal';
+      const tipChips = (compatList(s.compatibil).length?compatList(s.compatibil):['Universal']).map(t=>{const c=t.toUpperCase()==='CRAFTER'?'var(--crafter)':t.toUpperCase()==='T6'?'var(--t6)':'#888';return `<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;background:${c}22;color:${c};font-family:var(--mono)">${t}</span>`;}).join('');
       const editBtn=canEditStoc()?`<button class="icon-btn" onclick="stocOpenEdit(${s.id})">✎</button>`:'';
       return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
@@ -4131,7 +4144,7 @@ function renderStoc(){
               ${s.marime?`<span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:3px;background:rgba(18,24,38,.08);color:var(--text);font-family:var(--mono)">⭕ ${s.marime}</span>`:''}
               ${s.sezon?`<span style="font-size:10px;padding:2px 7px;border-radius:3px;background:rgba(100,100,100,.1);color:var(--text2)">${s.sezon}</span>`:''}
               ${s.owner?`<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;background:rgba(74,158,255,.12);color:#2f7fd6">${s.owner==='ion-srv'?'Ioan':s.owner==='vasile-srv'?'Vasile':s.owner}</span>`:'<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;background:rgba(255,159,74,.15);color:var(--t6)">nealocat — alege stocul</span>'}
-              <span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;background:${tipColor}22;color:${tipColor};font-family:var(--mono)">${tipLabel}</span>
+              ${tipChips}
               ${s.aniCompatibili?`<span style="font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;background:rgba(100,100,100,.1);color:var(--text2);font-family:var(--mono)">${s.aniCompatibili}</span>`:''}
               <span style="font-size:11px;color:var(--text3)">${s.categorie||'—'}</span>
             </div>
@@ -4149,6 +4162,16 @@ function renderStoc(){
     }).join('')+'</div>';
 }
 
+function compatList(v){return String(v||'').split(/[,;+\/]+/).map(x=>x.trim()).filter(Boolean);}
+function stocSetCompat(v){
+  const l=compatList(v).map(x=>x.toUpperCase());
+  document.querySelectorAll('#stoc-new-compat input').forEach(c=>{c.checked=l.includes(c.value.toUpperCase());});
+}
+function stocGetCompat(){
+  const l=[...document.querySelectorAll('#stoc-new-compat input:checked')].map(c=>c.value);
+  if(l.includes('Universal')) return 'Universal';
+  return l.join(', ')||null;
+}
 function stocOpenAdd(){
   if(!canEditStoc()){toast('Nu ai drept să adaugi piese');return;}
   editingStocId=null;
@@ -4156,7 +4179,7 @@ function stocOpenAdd(){
   document.getElementById('stoc-delete-btn').style.display='none';
   ['stoc-new-nume','stoc-new-cant','stoc-new-pret','stoc-new-cod','stoc-new-ani'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('stoc-new-cat').value='Filtre';
-  document.getElementById('stoc-new-compat').value='CRAFTER';
+  stocSetCompat('CRAFTER');
   document.getElementById('stoc-new-marime').value=''; document.getElementById('stoc-new-sezon').value='';
   document.getElementById('stoc-new-comun').checked=false;
   const _mu=['ion-srv','vasile-srv'];
@@ -4175,7 +4198,7 @@ function stocOpenEdit(id){
   document.getElementById('stoc-new-cat').value=s.categorie||'Filtre';
   document.getElementById('stoc-new-cant').value=s.cantitate||0;
   document.getElementById('stoc-new-pret').value=s.pret||'';
-  document.getElementById('stoc-new-compat').value=s.compatibil||'CRAFTER';
+  stocSetCompat(s.compatibil||'CRAFTER');
   document.getElementById('stoc-new-cod').value=s.cod||'';
   document.getElementById('stoc-new-ani').value=s.aniCompatibili||'';
   document.getElementById('stoc-new-marime').value=s.marime||''; document.getElementById('stoc-new-sezon').value=s.sezon||'';
@@ -4205,7 +4228,7 @@ function stocSave(){
     categorie:document.getElementById('stoc-new-cat').value,
     cantitate:parseInt(document.getElementById('stoc-new-cant').value)||0,
     pret:parseFloat(document.getElementById('stoc-new-pret').value)||null,
-    compatibil:document.getElementById('stoc-new-compat').value.trim()||null,
+    compatibil:stocGetCompat(),
     cod:document.getElementById('stoc-new-cod').value.trim()||null,
     aniCompatibili:document.getElementById('stoc-new-ani').value.trim()||null,
     addedAt:new Date().toISOString()
@@ -4387,14 +4410,13 @@ const _pkTipGetter = {
 // altfel tipul piesei (CRAFTER/T6/ELEKTRO) trebuie să fie același cu al mașinii.
 function pkCompatible(st, tip){
   if(!st) return false;
-  const c=(st.compatibil||'').trim();
-  if(!c || c.toLowerCase()==='universal' || c.toUpperCase()==='ALTELE') return true;
-  if((st.categorie||'').toLowerCase()==='altele') return true;
-  const mt=tip||'';
+  const cl=compatList(st.compatibil).map(x=>x.toUpperCase());
+  if(!cl.length || cl.includes('UNIVERSAL') || cl.includes('ALTELE')) return true;
+  const mt=String(tip||'').trim().toUpperCase();
   if(!mt) return false;
   const known=['CRAFTER','T6','ELEKTRO'];
   const carKey = known.includes(mt)?mt:'ALTELE';
-  return c.toUpperCase()===carKey;
+  return cl.includes(carKey);
 }
 // Verifică piesele alese pentru mașina curentă; întoarce numele pieselor nepotrivite
 function pkMismatches(key){
@@ -4547,8 +4569,8 @@ function scadeStoc(descriere, masinaTip){
     // Verifică dacă descrierea conține numele piesei
     if(!desc.includes(s.nume.toLowerCase())) return;
     // Verifică compatibilitatea cu tipul mașinii
-    const compat = s.compatibil||'Universal';
-    if(compat==='Universal' || !masinaTip || compat===masinaTip){
+    const cl = compatList(s.compatibil).map(x=>x.toUpperCase());
+    if(!cl.length || cl.includes('UNIVERSAL') || !masinaTip || cl.includes(String(masinaTip).toUpperCase())){
       s.cantitate=Math.max(0,s.cantitate-1);
       changed=true;
     }
@@ -5280,8 +5302,8 @@ function srvmAddRep(){
     status:'done',addedBy:currentUser?.name||'unknown',addedAt:new Date().toISOString(),manual:true
   });
   ['srvm-add-km','srvm-add-desc','srvm-add-cost','srvm-add-obs'].forEach(id=>document.getElementById(id).value='');
-  saveToCloud();renderSrvmContent(currentSrvMasinaId);renderSrvMasini();
-  toast('Reparație adăugată');
+  window._toastOnSave=true;saveToCloud();renderSrvmContent(currentSrvMasinaId);renderSrvMasini();
+  toast('Reparație adăugată — se salvează…');
 }
 
 document.addEventListener('keydown',e=>{ if(e.key==='Escape' && document.getElementById('srv-modal-istoric-masina')?.classList.contains('open')) srvmClose(); });
@@ -6651,7 +6673,8 @@ function srvAddReparatie(){
     addedAt: new Date().toISOString()
   });
 
-  toast(_short.length ? ('Reparație adăugată · ⚠ Stoc insuficient pentru: '+_short.join(', ')) : 'Reparație adăugată');
+  window._toastOnSave=true;
+  toast(_short.length ? ('Reparație adăugată (se salvează…) · ⚠ Stoc insuficient pentru: '+_short.join(', ')) : 'Reparație adăugată — se salvează…');
 
   // Backup automat la reparație nouă
   backupAuto(`Reparație nouă — ${m.nr} de ${currentUser?.name}`);
@@ -7006,7 +7029,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261030-162600';
+const APP_VERSION='20261030-230757';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
