@@ -2274,6 +2274,7 @@ function startSync(){
     // Ascunde loading — app-ul e deja vizibil (deschis din _showApp după PIN)
     document.getElementById('loading').style.display='none';
     renderAll();
+    setTimeout(()=>{ try{ flotaSlimDoc(); }catch(e){} },3000);
   }, (err)=>{
     console.error(err);
     document.getElementById('loading').innerHTML=`<div style="padding:20px;text-align:center;max-width:400px"><div style="color:var(--danger);font-size:14px;margin-bottom:10px">Eroare conexiune</div><div style="font-size:12px;color:var(--text2)">${err.message}</div><div style="margin-top:14px;font-size:12px;color:var(--text3)">Verifică ghidul de instalare — probabil regulile Firestore nu sunt setate.</div></div>`;
@@ -2382,7 +2383,8 @@ function hydrateFromCloud(d){
   stocAlert = d.stocAlert ? JSON.parse(JSON.stringify(d.stocAlert)) : null;
   backupuri = (d.backupuri||[]).map(b=>({id:b.id,timestamp:b.timestamp,triggerBy:b.triggerBy,size:b.size||0}));
   backupIdCtr = d.backupIdCtr || 1;
-  flotaBackupuri = (d.flotaBackupuri||[]).map(b=>({id:b.id,timestamp:b.timestamp,triggerBy:b.triggerBy,size:b.size||0,snapshot:b.snapshot||''}));
+  window._hadDocSnapshots = (d.flotaBackupuri||[]).length>0;   // copiile din document nu se mai folosesc (backup-urile sunt în bucket) — se șterg la următoarea salvare
+  flotaBackupuri = [];
   flotaBackupIdCtr = d.flotaBackupIdCtr || 1;
   garantii = (d.garantii||[]).map(g=>({...g}));
   garantiiIdCtr = d.garantiiIdCtr || 1;
@@ -2689,6 +2691,7 @@ function _mergeKeyed(name, remote, local){
 }
 function _mergeDoc(remote, payload){
   const merged={...remote, ...payload};
+  merged.flotaBackupuri=[];   // copiile din document au fost înlocuite de backup-urile din bucket — nu se mai păstrează
   Object.keys(_KEYED).forEach(n=>{
     if(!(n in payload)) return;
     merged[n]=_mergeKeyed(n, remote[n]||[], payload[n]||[]);
@@ -2787,7 +2790,7 @@ function saveToCloud(){
       lastModifiedAt: new Date().toISOString()
     };
     try{
-      { const _sz=JSON.stringify(window._noUndef(payload)).length; if(_sz>900000) _saveBanner('⚠ Documentul flotei are '+Math.round(_sz/1024)+' KB și se apropie de limita Firestore (1024 KB). Anunță adminul — la limită, salvările vor începe să eșueze.'); }
+      { const _P=window._noUndef(payload), _sz=JSON.stringify(_P).length; if(_sz>700000){ const parts=Object.keys(_P).map(k=>[k,JSON.stringify(_P[k]).length]).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]+' '+Math.round(x[1]/1024)+' KB').join(', '); _saveBanner('⚠ Documentul flotei are '+Math.round(_sz/1024)+' KB și se apropie de limita Firestore (1024 KB). Cele mai mari: '+parts+'. Anunță adminul.'); } else if(_saveBannerKind==='warn') _saveBanner(null); }
       await window.fbHelpers.setDoc(window.fbDocRef, window._noUndef(payload));
       isSaving=false; _saveFailed=false; if(_saveBannerKind==='fail') _saveBanner(null);
       if(window._toastOnSave){ window._toastOnSave=false; toast('✓ Salvat în cloud'); }
@@ -4583,7 +4586,8 @@ function scadeStoc(descriere, masinaTip){
 // ═════════════════════════════════════════════════════════════
 let flotaBackupuri = [];
 let flotaBackupIdCtr = 1;
-const MAX_FLOTA_BACKUPS = 2; // copiile din document ocupau >500 KB (limita documentului e 1 MB); backup-urile reale sunt pe server (06:00 și 20:00)
+const MAX_FLOTA_BACKUPS = 0;   // copiile NU se mai țin în documentul principal (îl umpleau până la limita de 1 MB); backup-urile reale sunt pe server
+const _OLD_MAX_FLOTA_BACKUPS = 2; // copiile din document ocupau >500 KB (limita documentului e 1 MB); backup-urile reale sunt pe server (06:00 și 20:00)
 
 function flotaCreateSnapshot(triggerBy){
   const snap = {
@@ -4604,16 +4608,20 @@ function flotaCreateSnapshot(triggerBy){
   return b;
 }
 
+function flotaSlimDoc(){   // scoate din documentul principal copiile vechi (backup-urile reale sunt în bucket, pe server)
+  if(!isAdminUser||!window._hadDocSnapshots) return; window._hadDocSnapshots=false;
+  flotaBackupuri=[]; saveToCloud(); try{ renderFlotaBackupList(); updateFlotaBackupBanner(); }catch(e){} toast('🧹 Copiile vechi de backup scoase din document (rămân cele de pe server)');
+}
 function flotaBackupAuto(triggerBy){
-  flotaCreateSnapshot(triggerBy);
+  // nu se mai păstrează în documentul principal (backup-urile reale sunt pe server, 06:00 și 20:00)
 }
 
 function flotaBackupManual(){
   if(!isAdminUser){ toast('Doar adminul poate face backup'); return; }
-  flotaCreateSnapshot('Manual — ' + (currentUser?.name||'admin'));
-  saveToCloud();
-  renderFlotaBackupList();
-  toast('✓ Backup flotă creat');
+  const snap = { masini, soferi, log: log.map(l=>({...l, preluat:l.preluat?l.preluat.toISOString():null, restituit:l.restituit?l.restituit.toISOString():null})), carIdCtr, logIdCtr, admins, knownUsers };
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(snap)], {type:'application/json'}));
+  a.download = 'backup_flota_'+new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')+'.json'; a.click();
+  toast('✓ Backup flotă descărcat ca fișier (restaurare: „Încarcă din fișier”)');
 }
 
 function flotaBackupExportLast(){
@@ -7029,7 +7037,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261030-230757';
+const APP_VERSION='20261106-125551';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
