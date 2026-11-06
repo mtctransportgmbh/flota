@@ -1623,7 +1623,7 @@ body.user-mode .log-mobile-card {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, signInWithCustomToken, signOut, onAuthStateChanged, updateProfile, setPersistence, browserLocalPersistence }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, onSnapshot, runTransaction, enableIndexedDbPersistence }
+import { getFirestore, doc, setDoc, getDoc, onSnapshot, runTransaction, enableIndexedDbPersistence, collection, writeBatch }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getFunctions, httpsCallable }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
@@ -1670,7 +1670,11 @@ if (!firebaseConfig || !firebaseConfig.apiKey) {
     setDoc: (ref, payload) => window.mergeSetDoc(ref, payload),
     runTransaction,
     getDoc,
-    onSnapshot
+    onSnapshot,
+    // reparațiile stau într-o colecție separată (câte un document pe reparație), ca documentul principal să nu atingă limita de 1 MB
+    repColl: () => collection(db, "flota_reparatii"),
+    repRef: (id) => doc(db, "flota_reparatii", String(id)),
+    batch: () => writeBatch(db)
   };
   window.fbDb = db;
   // Apel către funcțiile din Cloud Functions (autentificarea se face pe server)
@@ -2262,6 +2266,7 @@ window.addEventListener('firebase-ready', ()=>{
 
 // ── SYNC CU FIREBASE ─────────────────────────────────────────────────
 function startSync(){
+  startRepSync();
   window.fbHelpers.onSnapshot(window.fbDocRef, (snap)=>{
     if(snap.exists()){
       const d=snap.data();
@@ -2275,6 +2280,8 @@ function startSync(){
     // Ascunde loading — app-ul e deja vizibil (deschis din _showApp după PIN)
     document.getElementById('loading').style.display='none';
     renderAll();
+    if(window._repColl && (window._docRep||[]).length) repReabsorb();   // un dispozitiv vechi a scris iar reparații în documentul principal
+    repTryInit();
     setTimeout(()=>{ try{ flotaSlimDoc(); }catch(e){} },3000);
   }, (err)=>{
     console.error(err);
@@ -2378,8 +2385,9 @@ function hydrateFromCloud(d){
   window._currentForcedLogouts = d.forcedLogouts || {};
 
   // Reparații Service
-  reparatii = (d.reparatii||[]).map(r=>({...r}));
-  repIdCtr = d.repIdCtr || 1;
+  window._docRep = (d.reparatii||[]).map(r=>({...r}));   // reparațiile rămase în documentul principal (format vechi) — se mută în colecție
+  if(!window._repColl) reparatii = window._docRep.map(r=>({...r}));
+  repIdCtr = Math.max(d.repIdCtr || 1, repIdCtr || 1);
   // Sarcini Service
   taskuri = (d.taskuri||[]).map(t=>({...t}));
   taskIdCtr = d.taskIdCtr || 1;
@@ -2699,9 +2707,11 @@ function _mergeKeyed(name, remote, local){
 }
 function _mergeDoc(remote, payload){
   const merged={...remote, ...payload};
+  if(window._repColl){ delete merged.reparatii; merged.repIdCtr=Math.max(remote.repIdCtr||1, payload.repIdCtr||1, ...reparatii.map(r=>typeof r.id==='number'?r.id+1:0)); }
   merged.flotaBackupuri=[];   // copiile din document au fost înlocuite de backup-urile din bucket — nu se mai păstrează
   Object.keys(_KEYED).forEach(n=>{
     if(!(n in payload)) return;
+    if(n==='reparatii' && window._repColl) return;   // reparațiile sunt în colecția flota_reparatii
     merged[n]=_mergeKeyed(n, remote[n]||[], payload[n]||[]);
     const c=_CTR[n];
     if(c && _KEYED[n]==='id'){
@@ -2733,6 +2743,7 @@ function _noUndef(v){
 window._noUndef=_noUndef;
 window.mergeSetDoc=async function(ref, payload){
   const H=window.fbHelpers;
+  await saveRepDiff();   // reparațiile (colecție separată) — doar ce s-a schimbat
   await H.runTransaction(window.fbDb, async tx=>{
     const snap=await tx.get(ref);
     const remote=snap.exists()?snap.data():{};
@@ -2743,6 +2754,63 @@ window.mergeSetDoc=async function(ref, payload){
   _setBaseline(nb);
 };
 
+// ── REPARAȚII ÎN COLECȚIE SEPARATĂ: flota_reparatii/{id} ────────────────────────────
+// Documentul principal ajunsese la ~900 KB (limita Firestore e 1 MB), în mare parte din reparații. Acum fiecare reparație e
+// un document al ei; în memorie rămâne același array `reparatii`, iar la salvare se scriu doar reparațiile adăugate/modificate/șterse.
+window._repColl=false;
+let _repBase=new Map(), _repUnsub=null, _repSnap=null, _repSnapPending=false, _repInitBusy=false;
+function _repLocalMap(){ const m=new Map(); reparatii.forEach(r=>m.set(r.id,_st(r))); return m; }
+function _repDiff(){ const loc=_repLocalMap(); const add=[], del=[]; reparatii.forEach(r=>{ if(_repBase.get(r.id)!==loc.get(r.id)) add.push(r); }); _repBase.forEach((_,id)=>{ if(!loc.has(id)) del.push(id); }); return {add,del}; }
+function _repDirty(){ if(!window._repColl) return false; const d=_repDiff(); return d.add.length>0||d.del.length>0; }
+function startRepSync(){
+  if(_repUnsub) return;
+  try{
+    _repUnsub=window.fbHelpers.onSnapshot(window.fbHelpers.repColl(), snap=>{ _repSnap=snap; repTryInit(); },
+      err=>{ console.warn('flota_reparatii indisponibilă (reguli nepublicate?) — rămâne modul vechi:', err&&err.code); });
+  }catch(e){ console.warn('startRepSync',e); }
+}
+function applyRepSnap(){
+  if(!_repSnap) return;
+  if(savePending||isSaving||_repDirty()){ _repSnapPending=true; return; }
+  _repSnapPending=false;
+  const arr=_repSnap.docs.map(d=>{ const x=d.data(); if(x.id===undefined||x.id===null) x.id=Number(d.id); return x; }).sort((a,b)=>a.id-b.id);
+  reparatii=arr.map(r=>({...r}));
+  _repBase=new Map(reparatii.map(r=>[r.id,_st(r)]));
+  try{ repIdCtr=Math.max(repIdCtr||1, ...reparatii.map(r=>(typeof r.id==='number'?r.id+1:0))); }catch(e){}
+  try{ renderAll(); }catch(e){}
+}
+function repFlushPending(){ if(_repSnapPending) setTimeout(applyRepSnap,0); }
+async function repWriteDocs(list){
+  const H=window.fbHelpers;
+  for(let i=0;i<list.length;i+=400){ const b=H.batch(); list.slice(i,i+400).forEach(r=>b.set(H.repRef(r.id), _noUndef({...r}))); await b.commit(); }
+}
+async function repTryInit(){
+  if(!_repSnap||window._docRep===undefined) return;
+  if(window._repColl){ applyRepSnap(); return; }
+  if(_repInitBusy) return; _repInitBusy=true;
+  try{
+    const have=new Set(_repSnap.docs.map(d=>String(d.id)));
+    const miss=(window._docRep||[]).filter(r=>r&&r.id!==undefined&&!have.has(String(r.id)));
+    if(miss.length) await repWriteDocs(miss);       // mută reparațiile din documentul vechi (doar cele care lipsesc din colecție)
+    window._repColl=true; _repInitBusy=false;
+    if(!miss.length) applyRepSnap();                // altfel snapshot-ul se reîmprospătează singur după scriere
+    saveToCloud();                                  // scoate câmpul `reparatii` din documentul principal
+  }catch(e){ _repInitBusy=false; console.warn('Migrare reparații eșuată — rămâne modul vechi:', e); }
+}
+async function repReabsorb(){
+  try{ const miss=(window._docRep||[]).filter(r=>r&&r.id!==undefined&&!_repBase.has(r.id)); if(miss.length) await repWriteDocs(miss); window._docRep=[]; saveToCloud(); }catch(e){ console.warn('reabsorb',e); }
+}
+async function saveRepDiff(){
+  if(!window._repColl) return;
+  const H=window.fbHelpers; let {add,del}=_repDiff(); if(!add.length&&!del.length) return;
+  // reparație nouă cu același id creat simultan pe alt dispozitiv → alt id
+  for(const r of add){ if(_repBase.has(r.id)) continue; const ex=await H.getDoc(H.repRef(r.id));
+    if(ex.exists()&&_st(ex.data())!==_st(r)){ let n=Math.max(repIdCtr||1,r.id)+1; while((await H.getDoc(H.repRef(n))).exists()) n++; r.id=n; repIdCtr=Math.max(repIdCtr||1,n+1); } }
+  ({add,del}=_repDiff());
+  const ops=[...add.map(r=>({t:'s',r})), ...del.map(id=>({t:'d',id}))];
+  for(let i=0;i<ops.length;i+=400){ const b=H.batch(); ops.slice(i,i+400).forEach(o=>{ if(o.t==='s') b.set(H.repRef(o.r.id), _noUndef({...o.r})); else b.delete(H.repRef(o.id)); }); await b.commit(); }
+  add.forEach(r=>_repBase.set(r.id,_st(r))); del.forEach(id=>_repBase.delete(id));
+}
 let _saveFailed=false, _saveBannerKind='';
 function _saveBanner(msg,kind){
   let b=document.getElementById('save-fail-banner');
@@ -2797,10 +2865,12 @@ function saveToCloud(){
       lastModifiedBy: currentUser?.name || 'unknown',
       lastModifiedAt: new Date().toISOString()
     };
+    if(window._repColl) delete payload.reparatii;
     try{
       { const _P=window._noUndef(payload), _sz=JSON.stringify(_P).length; if(_sz>700000){ const parts=Object.keys(_P).map(k=>[k,JSON.stringify(_P[k]).length]).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]+' '+Math.round(x[1]/1024)+' KB').join(', '); _saveBanner('⚠ Documentul flotei are '+Math.round(_sz/1024)+' KB și se apropie de limita Firestore (1024 KB). Cele mai mari: '+parts+'. Anunță adminul.'); } else if(_saveBannerKind==='warn') _saveBanner(null); }
       await window.fbHelpers.setDoc(window.fbDocRef, window._noUndef(payload));
       isSaving=false; _saveFailed=false; if(_saveBannerKind==='fail') _saveBanner(null);
+      repFlushPending();
       if(window._toastOnSave){ window._toastOnSave=false; toast('✓ Salvat în cloud'); }
     } catch(e){
       console.error('Save failed:', e);
@@ -7045,7 +7115,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261106-130242';
+const APP_VERSION='20261106-131636';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
