@@ -570,6 +570,8 @@ body.user-mode .log-mobile-card {
   <button class="tab-btn" onclick="showTab('log')">Log</button>
   <button class="tab-btn" onclick="showTab('amenda')">Verificare amendă</button>
   <button class="tab-btn" onclick="showTab('soferi')">Șoferi</button>
+  <button class="tab-btn" onclick="showTab('curat')">🧽 Curățenie</button>
+  <button class="tab-btn" id="tab-btn-eisrep" onclick="showTab('eisrep')" style="display:none">🛠 Reparații Eiselfing</button>
   <button class="tab-btn" onclick="showTab('setari')">Setări</button>
   <button class="tab-btn" id="tab-btn-stricate" onclick="showTab('stricate')" style="display:none">🔧 Stricate</button>
   <button class="tab-btn" id="tab-btn-admin" onclick="showTab('admin')" style="display:none">⚙ Admin</button>
@@ -638,6 +640,8 @@ body.user-mode .log-mobile-card {
   </div>
 
   <!-- ── TAB ȘOFERI ───────────────────────────────────────── -->
+  <div id="tab-curat" style="display:none"><div id="curat-section"></div></div>
+  <div id="tab-eisrep" style="display:none"><div id="eisrep-section"></div></div>
   <div id="tab-soferi" style="display:none">
     <div id="soferi-section" class="soferi-grid"></div>
   </div>
@@ -1277,6 +1281,17 @@ body.user-mode .log-mobile-card {
   </div>
 </div>
 
+<!-- Finalizare sarcină Eiselfing (km obligatoriu) -->
+<div class="modal-overlay" id="modal-eis-done" onclick="if(event.target===this)eisCloseDone()">
+  <div class="modal">
+    <div class="modal-title">✔ Finalizează sarcina</div>
+    <div id="eis-done-sub" style="font-size:13px;color:var(--text2);margin-bottom:10px"></div>
+    <div class="modal-field"><div class="modal-label">Kilometraj (km) — OBLIGATORIU *</div><input id="eis-done-km" type="number" min="1" inputmode="numeric" placeholder="ex: 123456"></div>
+    <div class="modal-field"><div class="modal-label">Observații (opțional)</div><input id="eis-done-obs" type="text" placeholder="ex: 4 cauciucuri de iarnă montate"></div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:10px">La finalizare se adaugă automat în istoricul de reparații al mașinii (cu km și data de azi).</div>
+    <div class="modal-actions"><button class="btn" onclick="eisCloseDone()">Anulează</button><button class="btn btn-primary" onclick="eisFinalize()">Finalizează</button></div>
+  </div>
+</div>
 <!-- Adăugare cantitate la o piesă existentă -->
 <div class="modal-overlay" id="srv-modal-stoc-qty" onclick="if(event.target===this)stocQtyClose()">
   <div class="modal">
@@ -1659,7 +1674,7 @@ body.user-mode .log-mobile-card {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, signInWithCustomToken, signOut, onAuthStateChanged, updateProfile, setPersistence, browserLocalPersistence }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, onSnapshot, runTransaction, enableIndexedDbPersistence, collection, writeBatch }
+import { getFirestore, doc, setDoc, getDoc, onSnapshot, runTransaction, enableIndexedDbPersistence, collection, writeBatch, deleteDoc }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getFunctions, httpsCallable }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
@@ -1710,6 +1725,12 @@ if (!firebaseConfig || !firebaseConfig.apiKey) {
     // reparațiile stau într-o colecție separată (câte un document pe reparație), ca documentul principal să nu atingă limita de 1 MB
     repColl: () => collection(db, "flota_reparatii"),
     repRef: (id) => doc(db, "flota_reparatii", String(id)),
+    // curățenie (un document pe lună) și sarcinile Eiselfing (un document pe sarcină) — colecții separate, nu încarcă documentul principal
+    curColl: () => collection(db, "flota_curatenie"),
+    curRef: (id) => doc(db, "flota_curatenie", String(id)),
+    eisColl: () => collection(db, "flota_eis_tasks"),
+    eisRef: (id) => doc(db, "flota_eis_tasks", String(id)),
+    rawDelete: deleteDoc,
     batch: () => writeBatch(db)
   };
   window.fbDb = db;
@@ -2302,7 +2323,7 @@ window.addEventListener('firebase-ready', ()=>{
 
 // ── SYNC CU FIREBASE ─────────────────────────────────────────────────
 function startSync(){
-  startRepSync();
+  startRepSync(); try{ startCurSync(); startEisSync(); }catch(e){ console.warn('curat/eis sync',e); }
   window.fbHelpers.onSnapshot(window.fbDocRef, (snap)=>{
     if(snap.exists()){
       const d=snap.data();
@@ -2534,9 +2555,10 @@ function updateAdminUI(){
   const _eis=isEiselfingUser();
   document.querySelectorAll('.tabs-bar .tab-btn').forEach(b=>{
     const oc=b.getAttribute('onclick')||'';
-    if(_eis) b.style.display = (oc.includes("'masini'")||oc.includes("'soferi'")||oc.includes("'disponibil'")||oc.includes("'log'")||oc.includes("'amenda'")||oc.includes("'stricate'")) ? '' : 'none';
+    if(_eis) b.style.display = (oc.includes("'masini'")||oc.includes("'soferi'")||oc.includes("'disponibil'")||oc.includes("'log'")||oc.includes("'amenda'")||oc.includes("'stricate'")||oc.includes("'curat'")||oc.includes("'eisrep'")) ? '' : 'none';
     else if(!b.id && b.textContent.trim()!=='Setări') b.style.display='';
   });
+  { const eb=document.getElementById('tab-btn-eisrep'); if(eb) eb.style.display=(isAdmin||_eis)?'':'none'; }
   document.querySelectorAll('#toolbar-masini .filter-btn').forEach(b=>{
     const f=b.dataset.filter;
     if(_eis && (!f || ['DEPOZIT','EISELFING_LOC','RUHSTORF_LOC','PAKETSHOP'].includes(f))) b.style.display='none';
@@ -2789,6 +2811,197 @@ window.mergeSetDoc=async function(ref, payload){
   const nb=_serialLocal(); Object.keys(payload).forEach(k=>{ if(k in nb) nb[k]=payload[k]; });
   _setBaseline(nb);
 };
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ── CURĂȚENIE: bifare curat / murdar pe mașină, istoric și avertizări ───────
+// Datele stau în colecția flota_curatenie (un document pe lună): { e: { "<data>_<idMașină>": {d,m,n,s,v,b,t} } }
+// v: 1 = curat, 0 = murdar, -1 = bifă ștearsă. s = șoferul de la data respectivă.
+// ═════════════════════════════════════════════════════════════════════════════
+const CUR_SPECIAL=['DEPOZIT','POLLING','EISELFING','AVP','PAKETSHOP','STRICATA','DHL','OUT'];
+let curData={}, curUnsub=null, curDate='', curLoc='all', curDrvOv={}, curShowStat=false;
+function curTodayISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function curIsPerson(n){ n=String(n||'').trim(); return !!n && !CUR_SPECIAL.includes(n.toUpperCase()); }
+function startCurSync(){
+  if(curUnsub) return;
+  curUnsub=window.fbHelpers.onSnapshot(window.fbHelpers.curColl(), snap=>{
+    const m={}; snap.docs.forEach(d=>{ const e=(d.data()||{}).e||{}; Object.keys(e).forEach(k=>{ const x=e[k]; if(x&&(x.v===0||x.v===1)) m[k]=x; }); });
+    curData=m; if(document.getElementById('tab-curat')&&document.getElementById('tab-curat').style.display!=='none') renderCurat();
+  }, err=>console.warn('flota_curatenie indisponibilă (reguli nepublicate?):', err&&err.code));
+}
+// șoferul care avea mașina la o dată (din Log); pentru azi — cel curent
+function curDriverAt(m,iso){
+  if(iso===curTodayISO()) return m.sofer||'';
+  const t0=new Date(iso+'T00:00:00').getTime(), t1=t0+86400000;
+  let best=null;
+  log.forEach(l=>{ if(l.nr!==m.nr||!l.preluat) return; const a=new Date(l.preluat).getTime(), b=l.restituit?new Date(l.restituit).getTime():Infinity; if(a<t1&&b>=t0&&(!best||a>best.a)) best={a,s:l.sofer}; });
+  return best?best.s:(m.sofer||'');
+}
+function curCanEdit(iso){ return isAdminUser || iso===curTodayISO(); }
+function curCars(){
+  const vis=new Set(visibleMasini().map(m=>m.id)); const out=[];
+  PC_LOCATIONS.forEach(loc=>{ if(curLoc!=='all'&&curLoc!==loc) return; const cs=pcCars(loc,false).filter(m=>vis.has(m.id)); if(cs.length) out.push({loc,cars:cs}); });
+  return out;
+}
+function curAnalyze(){
+  const vis=new Set(visibleMasini().map(m=>m.id));
+  const all=Object.values(curData).filter(x=>vis.has(x.m)).sort((a,b)=>a.d.localeCompare(b.d)||String(a.t||'').localeCompare(String(b.t||'')));
+  const byCar={}, byPer={};
+  all.forEach(x=>{ (byCar[x.m]=byCar[x.m]||[]).push(x); if(curIsPerson(x.s)) (byPer[x.s]=byPer[x.s]||[]).push(x); });
+  const streak=arr=>{ let n=0; for(let i=arr.length-1;i>=0&&arr[i].v===0;i--) n++; return n; };
+  const stat=(arr)=>({n:arr.length, dirty:arr.filter(x=>x.v===0).length, streak:streak(arr)});
+  const cars=Object.keys(byCar).map(id=>{ const arr=byCar[id]; const st=stat(arr); return {id:+id, nr:arr[arr.length-1].n, ...st, who:Array.from(new Set(arr.slice(arr.length-st.streak).map(x=>x.s).filter(Boolean)))}; });
+  const pers=Object.keys(byPer).map(n=>{ const arr=byPer[n]; const st=stat(arr); return {name:n, ...st, carsL:Array.from(new Set(arr.slice(arr.length-st.streak).map(x=>x.n)))}; });
+  return {cars,pers,total:all.length};
+}
+function curSetLoc(l){ curLoc=l; renderCurat(); }
+function curSetDate(v){ if(!v) return; if(v>curTodayISO()) v=curTodayISO(); curDate=v; renderCurat(); }
+function curSetV(carId,v){
+  const iso=curDate||curTodayISO();
+  if(!curCanEdit(iso)){ toast('Poți bifa doar pentru azi'); return; }
+  const m=masini.find(x=>x.id===carId); if(!m) return;
+  const key=iso+'_'+carId; const cur=curData[key];
+  const newV=(cur&&cur.v===v)?-1:v;   // a doua apăsare pe aceeași stare o șterge
+  const ov=curDrvOv[key];
+  const entry={d:iso,m:carId,n:m.nr,s:(cur?cur.s:(ov!==undefined?ov:curDriverAt(m,iso)))||'',v:newV,b:currentUser?.name||'?',t:new Date().toISOString()};
+  const prev=cur; if(newV===-1) delete curData[key]; else curData[key]=entry;
+  renderCurat();
+  window.fbHelpers.rawSetDoc(window.fbHelpers.curRef(iso.slice(0,7)),{e:{[key]:entry}},{merge:true}).catch(e=>{
+    console.error('curatenie',e); if(prev) curData[key]=prev; else delete curData[key]; renderCurat(); toast('❌ Nu s-a salvat bifa — verifică conexiunea / regulile Firestore');
+  });
+}
+function curSetDriver(carId,name){
+  const iso=curDate||curTodayISO(); if(!isAdminUser) return; const key=iso+'_'+carId; const cur=curData[key];
+  if(!cur){ curDrvOv[key]=name; return; }
+  const entry={...cur,s:name,b:currentUser?.name||'?',t:new Date().toISOString()}; curData[key]=entry;
+  window.fbHelpers.rawSetDoc(window.fbHelpers.curRef(iso.slice(0,7)),{e:{[key]:entry}},{merge:true}).catch(e=>toast('❌ Nu s-a salvat șoferul'));
+}
+function curToggleStat(){ curShowStat=!curShowStat; renderCurat(); }
+function renderCurat(){
+  const sec=document.getElementById('curat-section'); if(!sec) return;
+  if(!curDate) curDate=curTodayISO();
+  const iso=curDate, today=curTodayISO(), edit=curCanEdit(iso), A=curAnalyze();
+  const names=soferi.map(x=>typeof x==='string'?x:x.name).filter(curIsPerson).sort((a,b)=>String(a).localeCompare(String(b)));
+  const warnC=A.cars.filter(c=>c.streak>=3).sort((a,b)=>b.streak-a.streak), warnP=A.pers.filter(p=>p.streak>=3).sort((a,b)=>b.streak-a.streak);
+  const warnSet=new Set(warnC.map(c=>c.id));
+  const locBtns=(isEiselfingUser()?[]:['all',...PC_LOCATIONS]).map(l=>`<button class="filter-btn${curLoc===l?' active':''}" onclick="curSetLoc('${l}')">${l==='all'?'Toate':l}</button>`).join('');
+  let h=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+    <input type="date" value="${iso}" max="${today}" ${isAdminUser?'':'disabled'} onchange="curSetDate(this.value)" style="background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:8px 10px;font-family:var(--mono)">
+    ${iso!==today?`<button class="filter-btn" onclick="curSetDate('${today}')">Azi</button>`:''}${locBtns}
+    <button class="filter-btn" onclick="curToggleStat()" style="margin-left:auto">📊 Statistică ${curShowStat?'▲':'▼'}</button>
+    ${isEiselfingUser()?'':`<button class="filter-btn" onclick="openPrintCheck()">🖨 Listă verificare</button>`}</div>`;
+  if(isAdminUser&&iso!==today) h+=`<div style="background:rgba(214,138,0,.12);border:1px solid rgba(214,138,0,.4);border-radius:var(--radius);padding:8px 12px;font-size:12px;margin-bottom:12px">📅 Adaugi pentru <b>${iso.split('-').reverse().join('.')}</b> (din trecut). Alege șoferul care conducea atunci, apoi Curat / Murdar.</div>`;
+  if(warnC.length||warnP.length){
+    h+=`<div style="background:rgba(255,90,90,.08);border:1px solid rgba(255,90,90,.35);border-radius:var(--radius);padding:12px 14px;margin-bottom:14px;font-size:13px"><b style="color:var(--danger)">⚠ Avertizări curățenie</b>`
+      +warnP.map(p=>`<div style="margin-top:6px">👤 <b>${pkEsc(p.name)}</b> — nu a făcut curat de <b>${p.streak}</b> ori la rând <span style="color:var(--text3)">(mașini: ${p.carsL.map(pkEsc).join(', ')})</span></div>`).join('')
+      +warnC.map(c=>`<div style="margin-top:6px">🚐 <b>${pkEsc(c.nr)}</b> — murdară <b>${c.streak}</b> verificări la rând <span style="color:var(--text3)">(${c.who.map(pkEsc).join(', ')||'șofer necunoscut'})</span></div>`).join('')+`</div>`;
+  }
+  if(curShowStat){
+    const mk=a=>a.map(c=>`<tr><td>${pkEsc(c.nr||c.name)}</td><td style="text-align:right">${c.n}</td><td style="text-align:right">${c.dirty}</td><td style="text-align:right">${Math.round(100*c.dirty/c.n)}%</td><td style="text-align:right;color:${c.streak>=3?'var(--danger)':'inherit'}">${c.streak}</td></tr>`).join('');
+    const srt=(a,b)=>b.streak-a.streak||b.dirty/b.n-a.dirty/a.n;
+    const th='<tr style="color:var(--text3);font-size:11px"><th style="text-align:left">&nbsp;</th><th style="text-align:right">Verificări</th><th style="text-align:right">Murdar</th><th style="text-align:right">% murdar</th><th style="text-align:right">Murdar la rând</th></tr>';
+    const box='background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px';
+    h+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin-bottom:14px"><div style="${box}"><b>👤 Pe persoană</b><table style="width:100%;font-size:12px;margin-top:6px;border-collapse:collapse">${th}${mk(A.pers.slice().sort(srt))||'<tr><td colspan=5 style="color:var(--text3)">Nicio verificare încă</td></tr>'}</table></div><div style="${box}"><b>🚐 Pe mașină</b><table style="width:100%;font-size:12px;margin-top:6px;border-collapse:collapse">${th}${mk(A.cars.slice().sort(srt))||'<tr><td colspan=5 style="color:var(--text3)">Nicio verificare încă</td></tr>'}</table></div></div>`;
+  }
+  const blocks=curCars();
+  if(!blocks.length) h+=`<div class="empty-state">Nicio mașină de verificat.</div>`;
+  h+=blocks.map(b=>`<div style="margin-bottom:16px"><div style="font-weight:600;margin-bottom:6px">${b.loc} <span style="color:var(--text3);font-weight:400;font-size:12px">· ${b.cars.length} mașini · ${b.cars.filter(m=>curData[iso+'_'+m.id]).length} bifate</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:8px">${b.cars.map(m=>{
+      const key=iso+'_'+m.id, e=curData[key]; const drv=e?e.s:(curDrvOv[key]!==undefined?curDrvOv[key]:curDriverAt(m,iso));
+      const su=String(drv||'').toUpperCase(); const dTxt=!drv?'—':(su==='EISELFING'||su==='PAKETSHOP'?'— '+b.loc+' —':drv);
+      const dSel=(isAdminUser&&iso!==today)?`<select onchange="curSetDriver(${m.id},this.value)" style="max-width:190px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:3px 4px;font-size:12px"><option value=""${!drv?' selected':''}>—</option>${names.map(n=>`<option value="${pkEsc(n)}"${n===drv?' selected':''}>${pkEsc(n)}</option>`).join('')}${drv&&!names.includes(drv)?`<option selected>${pkEsc(drv)}</option>`:''}</select>`:`<span style="font-size:12px;color:var(--text2)">${pkEsc(dTxt)}</span>`;
+      const bs=(v,l,c)=>`<button onclick="curSetV(${m.id},${v})" ${edit?'':'disabled'} style="flex:1;padding:8px 6px;border-radius:var(--radius);cursor:${edit?'pointer':'default'};border:1px solid ${c};font-weight:600;font-size:13px;${e&&e.v===v?`background:${c};color:#fff`:`background:transparent;color:${c}`}">${l}</button>`;
+      return `<div style="background:var(--surface);border:1px solid ${warnSet.has(m.id)?'var(--danger)':'var(--border)'};border-radius:var(--radius);padding:10px 12px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px"><b style="font-family:var(--mono)">${pkEsc(m.nr)}</b><span style="font-size:11px;color:var(--text3)">${pkEsc(m.tip||'')}</span>${warnSet.has(m.id)?'<span title="Murdară 3+ verificări la rând" style="color:var(--danger);font-size:12px">⚠ 3×</span>':''}</div><div style="margin-bottom:8px">${dSel}</div><div style="display:flex;gap:8px">${bs(1,'✓ Curat','#2e9e5b')}${bs(0,'✗ Murdar','#d33')}</div>${e?`<div style="font-size:10px;color:var(--text3);margin-top:6px">bifat de ${pkEsc(e.b||'?')}</div>`:''}</div>`;
+    }).join('')}</div></div>`).join('');
+  sec.innerHTML=h;
+}
+window.curSetLoc=curSetLoc; window.curSetDate=curSetDate; window.curSetV=curSetV; window.curSetDriver=curSetDriver; window.curToggleStat=curToggleStat; window.renderCurat=renderCurat;
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ── REPARAȚII EISELFING: sarcini pe mașini; la finalizare (km obligatoriu) intră în istoricul mașinii ──
+// Datele stau în colecția flota_eis_tasks (un document pe sarcină).
+// ═════════════════════════════════════════════════════════════════════════════
+let eisTasks=[], eisUnsub=null, eisView='pending', eisSel=new Set(), eisQ='', eisCompleting=null;
+function startEisSync(){
+  if(eisUnsub) return;
+  eisUnsub=window.fbHelpers.onSnapshot(window.fbHelpers.eisColl(), snap=>{
+    eisTasks=snap.docs.map(d=>{ const x=d.data(); if(x.id==null) x.id=Number(d.id)||d.id; return x; });
+    if(document.getElementById('tab-eisrep')&&document.getElementById('tab-eisrep').style.display!=='none') renderEisrep();
+  }, err=>console.warn('flota_eis_tasks indisponibilă (reguli nepublicate?):', err&&err.code));
+}
+function eisCan(){ return isAdminUser||isEiselfingUser(); }
+function eisToggleCar(id){ if(eisSel.has(id)) eisSel.delete(id); else eisSel.add(id); renderEisrep(true); }
+function eisSetQ(v){ eisQ=v; renderEisrep(true); }
+function eisSetView(v){ eisView=v; renderEisrep(); }
+function eisQuick(t){ const el=document.getElementById('eis-desc'); if(el){ el.value=t; el.focus(); } }
+async function eisAdd(){
+  if(!eisCan()) return;
+  const desc=((document.getElementById('eis-desc')||{}).value||'').trim();
+  if(!eisSel.size){ toast('Alege cel puțin o mașină'); return; }
+  if(!desc){ toast('Scrie ce trebuie făcut'); return; }
+  const ids=Array.from(eisSel); const now=new Date().toISOString();
+  try{
+    for(const id of ids){ const m=masini.find(x=>x.id===id); if(!m) continue; const tid=Date.now()*100+Math.floor(Math.random()*100);
+      const t={id:tid,masinaId:m.id,masinaNr:m.nr,masinaTip:m.tip||'',descriere:desc,status:'pending',createdBy:currentUser?.name||'?',createdByUsername:currentUser?.username||'',createdAt:now};
+      eisTasks.push(t); await window.fbHelpers.rawSetDoc(window.fbHelpers.eisRef(tid),t); }
+    eisSel=new Set(); toast('Adăugat pe '+ids.length+(ids.length===1?' mașină':' mașini')); renderEisrep();
+  }catch(e){ console.error(e); toast('❌ Nu s-a salvat — verifică conexiunea / regulile Firestore'); }
+}
+async function eisDelete(id){
+  const t=eisTasks.find(x=>x.id===id); if(!t) return;
+  if(!isAdminUser && t.createdByUsername!==currentUser?.username){ toast('Doar cine a creat sarcina sau admin o poate șterge'); return; }
+  if(!confirm('Ștergi sarcina „'+t.descriere+'” de la '+t.masinaNr+'?')) return;
+  try{ await window.fbHelpers.rawDelete(window.fbHelpers.eisRef(id)); }catch(e){ toast('❌ Nu s-a șters'); }
+}
+function eisOpenDone(id){
+  const t=eisTasks.find(x=>x.id===id); if(!t||!eisCan()) return; eisCompleting=id;
+  document.getElementById('eis-done-sub').textContent=t.masinaNr+' · '+t.descriere;
+  const k=document.getElementById('eis-done-km'); k.value=''; k.style.borderColor=''; document.getElementById('eis-done-obs').value='';
+  document.getElementById('modal-eis-done').classList.add('open'); setTimeout(()=>k.focus(),50);
+}
+function eisCloseDone(){ document.getElementById('modal-eis-done').classList.remove('open'); eisCompleting=null; }
+async function eisFinalize(){
+  const t=eisTasks.find(x=>x.id===eisCompleting); if(!t) return;
+  const km=srvRequireKm(document.getElementById('eis-done-km').value,t.masinaId,t.masinaNr,'eis-done-km'); if(km===null) return;
+  const obs=document.getElementById('eis-done-obs').value.trim(); const now=new Date(), iso=curTodayISO();
+  const rid=repIdCtr++;
+  reparatii.push({id:rid,masinaId:t.masinaId,masinaNr:t.masinaNr,masinaTip:t.masinaTip,data:iso,km,descriere:t.descriere,cost:0,costPiese:0,obs,status:'done',piese:[],fromEisTask:t.id,locatie:'Eiselfing',
+    addedBy:currentUser?.name||'?',addedByUsername:currentUser?.username||'',addedAt:now.toISOString(),completedBy:currentUser?.name||'?',completedAt:now.toISOString()});
+  const upd={...t,status:'done',km,obs,repId:rid,doneBy:currentUser?.name||'?',doneByUsername:currentUser?.username||'',doneAt:now.toISOString()};
+  Object.assign(t,upd);
+  eisCloseDone(); saveToCloud(); renderEisrep();
+  window.fbHelpers.rawSetDoc(window.fbHelpers.eisRef(t.id),upd).catch(e=>toast('❌ Sarcina nu s-a marcat finalizată în cloud'));
+  toast('Finalizat — reparația a intrat în istoricul mașinii');
+}
+function renderEisrep(keepFocus){
+  const sec=document.getElementById('eisrep-section'); if(!sec) return;
+  const can=eisCan(); const vis=visibleMasini().slice().sort((a,b)=>String(a.nr||'').localeCompare(String(b.nr||''),undefined,{numeric:true}));
+  const q=eisQ.toLowerCase(); const cars=vis.filter(m=>!q||String(m.nr||'').toLowerCase().includes(q));
+  const visIds=new Set(vis.map(m=>m.id)); const list=eisTasks.filter(t=>visIds.has(t.masinaId)||isAdminUser);
+  const pend=list.filter(t=>t.status!=='done').sort((a,b)=>String(a.masinaNr).localeCompare(String(b.masinaNr),undefined,{numeric:true})||String(a.createdAt).localeCompare(String(b.createdAt)));
+  const done=list.filter(t=>t.status==='done').sort((a,b)=>String(b.doneAt||'').localeCompare(String(a.doneAt||'')));
+  const quick=['Schimb cauciucuri','Schimb plăcuțe','Schimb ulei','Verificare generală'].map(x=>`<button class="filter-btn" style="min-height:30px;padding:4px 10px" onclick="eisQuick('${x}')">${x}</button>`).join('');
+  const fmt=iso=>iso?new Date(iso).toLocaleDateString('ro-RO'):'';
+  const inp='background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:8px 10px';
+  let h='';
+  if(can){
+    h+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px"><b>➕ Sarcină nouă</b>
+      <div style="font-size:12px;color:var(--text3);margin:4px 0 8px">Alege una sau mai multe mașini (${eisSel.size} alese), scrie ce trebuie făcut. Se creează câte o sarcină pe mașină.</div>
+      <input id="eis-q" placeholder="🔍 caută mașină…" value="${pkEsc(eisQ)}" oninput="eisSetQ(this.value)" style="width:100%;box-sizing:border-box;margin-bottom:8px;${inp}">
+      <div style="display:flex;flex-wrap:wrap;gap:6px;max-height:170px;overflow-y:auto;margin-bottom:8px">${cars.map(m=>`<label class="stoc-cp" style="${eisSel.has(m.id)?'border-color:var(--accent);background:rgba(46,158,91,.12)':''}"><input type="checkbox" ${eisSel.has(m.id)?'checked':''} onchange="eisToggleCar(${m.id})"> ${pkEsc(m.nr)} <span style="color:var(--text3);font-size:11px">${pkEsc(m.tip||'')}</span></label>`).join('')||'<span style="color:var(--text3)">Nicio mașină</span>'}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">${quick}</div>
+      <textarea id="eis-desc" rows="2" placeholder="ex: trebuie schimbate cauciucurile" style="width:100%;box-sizing:border-box;font-family:inherit;${inp}"></textarea>
+      <div style="margin-top:8px;text-align:right"><button class="btn btn-primary" onclick="eisAdd()">Adaugă sarcina</button></div></div>`;
+  }
+  h+=`<div style="display:flex;gap:8px;margin-bottom:10px"><button class="filter-btn${eisView==='pending'?' active':''}" onclick="eisSetView('pending')">De făcut <b>${pend.length}</b></button><button class="filter-btn${eisView==='done'?' active':''}" onclick="eisSetView('done')">Finalizate <b>${done.length}</b></button></div>`;
+  const arr=eisView==='pending'?pend:done;
+  h+=arr.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">${arr.map(t=>`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-family:var(--mono)">${pkEsc(t.masinaNr)}</b><span style="font-size:11px;color:var(--text3)">${pkEsc(t.masinaTip||'')}</span></div><div style="margin:6px 0;font-size:13px">${pkEsc(t.descriere)}</div><div style="font-size:11px;color:var(--text3)">adăugat ${fmt(t.createdAt)} de ${pkEsc(t.createdBy||'?')}</div>
+    ${t.status==='done'?`<div style="font-size:12px;color:var(--accent);margin-top:6px">✔ ${fmt(t.doneAt)} · ${Number(t.km).toLocaleString()} km · ${pkEsc(t.doneBy||'')}${t.obs?'<div style="color:var(--text3)">'+pkEsc(t.obs)+'</div>':''}</div>`:(can?`<div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-primary" style="flex:1" onclick="eisOpenDone(${t.id})">✔ Finalizat</button><button class="filter-btn" onclick="eisDelete(${t.id})" title="Șterge">🗑</button></div>`:'')}</div>`).join('')}</div>`:`<div class="empty-state">${eisView==='pending'?'Nicio sarcină de făcut.':'Nicio sarcină finalizată.'}</div>`;
+  const fe=document.activeElement&&document.activeElement.id; const val=(document.getElementById('eis-desc')||{}).value||'';
+  sec.innerHTML=h; const d=document.getElementById('eis-desc'); if(d&&val) d.value=val;
+  if(keepFocus&&fe==='eis-q'){ const i=document.getElementById('eis-q'); if(i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } }
+}
+window.eisToggleCar=eisToggleCar; window.eisSetQ=eisSetQ; window.eisSetView=eisSetView; window.eisQuick=eisQuick; window.eisAdd=eisAdd; window.eisDelete=eisDelete; window.eisOpenDone=eisOpenDone; window.eisCloseDone=eisCloseDone; window.eisFinalize=eisFinalize; window.renderEisrep=renderEisrep;
+document.addEventListener('input', e=>{ if(e.target.id==='eis-done-km') e.target.style.borderColor=''; });
 
 // ── REPARAȚII ÎN COLECȚIE SEPARATĂ: flota_reparatii/{id} ────────────────────────────
 // Documentul principal ajunsese la ~900 KB (limita Firestore e 1 MB), în mare parte din reparații. Acum fiecare reparație e
@@ -7072,8 +7285,9 @@ document.getElementById('srv-modal-edit').addEventListener('click', e=>{
 
 // ── TABS ─────────────────────────────────────────────────────────────
 function showTab(name){
-  if(isEiselfingUser() && !['masini','soferi','disponibil','log','amenda','stricate'].includes(name)) name='masini';
-  ['masini','disponibil','log','amenda','soferi','setari','stricate','admin','backup-flota'].forEach(t=>{
+  if(isEiselfingUser() && !['masini','soferi','disponibil','log','amenda','stricate','curat','eisrep'].includes(name)) name='masini';
+  if(name==='eisrep' && !(isAdminUser||isEiselfingUser())) name='masini';
+  ['masini','disponibil','log','amenda','soferi','curat','eisrep','setari','stricate','admin','backup-flota'].forEach(t=>{
     const el=document.getElementById('tab-'+t);
     if(el) el.style.display=t===name?'':'none';
   });
@@ -7086,6 +7300,8 @@ function showTab(name){
   if(name==='setari') renderSetari();
   if(name==='admin') renderAdmin();
   if(name==='stricate') renderStricate();
+  if(name==='curat') renderCurat();
+  if(name==='eisrep') renderEisrep();
   if(name==='backup-flota'){ renderFlotaBackupList(); updateFlotaBackupBanner(); }
 }
 
@@ -7241,7 +7457,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261106-141928';
+const APP_VERSION='20261106-145232';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
