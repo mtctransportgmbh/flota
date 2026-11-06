@@ -2930,6 +2930,8 @@ function startEisSync(){
 }
 function eisCan(){ return isAdminUser||isEiselfingUser(); }
 function eisToggleCar(id){ if(eisSel.has(id)) eisSel.delete(id); else eisSel.add(id); renderEisrep(true); }
+function eisSelAll(){ const q=eisQ.toLowerCase(); masini.filter(m=>pcLocationOf(m)==='Eiselfing'&&sk(m.sofer)!=='STRICATA'&&(!q||String(m.nr||'').toLowerCase().includes(q))).forEach(m=>eisSel.add(m.id)); renderEisrep(true); }
+function eisSelNone(){ eisSel=new Set(); renderEisrep(true); }
 function eisSetQ(v){ eisQ=v; renderEisrep(true); }
 function eisSetView(v){ eisView=v; renderEisrep(); }
 function eisQuick(t){ const el=document.getElementById('eis-desc'); if(el){ el.value=t; el.focus(); } }
@@ -2974,7 +2976,7 @@ async function eisFinalize(){
 }
 function renderEisrep(keepFocus){
   const sec=document.getElementById('eisrep-section'); if(!sec) return;
-  const can=eisCan(); const vis=visibleMasini().slice().sort((a,b)=>String(a.nr||'').localeCompare(String(b.nr||''),undefined,{numeric:true}));
+  const can=eisCan(); const vis=masini.filter(m=>pcLocationOf(m)==='Eiselfing'&&sk(m.sofer)!=='STRICATA').sort((a,b)=>String(a.nr||'').localeCompare(String(b.nr||''),undefined,{numeric:true}));
   const q=eisQ.toLowerCase(); const cars=vis.filter(m=>!q||String(m.nr||'').toLowerCase().includes(q));
   const visIds=new Set(vis.map(m=>m.id)); const list=eisTasks.filter(t=>visIds.has(t.masinaId)||isAdminUser);
   const pend=list.filter(t=>t.status!=='done').sort((a,b)=>String(a.masinaNr).localeCompare(String(b.masinaNr),undefined,{numeric:true})||String(a.createdAt).localeCompare(String(b.createdAt)));
@@ -2987,7 +2989,9 @@ function renderEisrep(keepFocus){
     h+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px"><b>➕ Sarcină nouă</b>
       <div style="font-size:12px;color:var(--text3);margin:4px 0 8px">Alege una sau mai multe mașini (${eisSel.size} alese), scrie ce trebuie făcut. Se creează câte o sarcină pe mașină.</div>
       <input id="eis-q" placeholder="🔍 caută mașină…" value="${pkEsc(eisQ)}" oninput="eisSetQ(this.value)" style="width:100%;box-sizing:border-box;margin-bottom:8px;${inp}">
-      <div style="display:flex;flex-wrap:wrap;gap:6px;max-height:170px;overflow-y:auto;margin-bottom:8px">${cars.map(m=>`<label class="stoc-cp" style="${eisSel.has(m.id)?'border-color:var(--accent);background:rgba(46,158,91,.12)':''}"><input type="checkbox" ${eisSel.has(m.id)?'checked':''} onchange="eisToggleCar(${m.id})"> ${pkEsc(m.nr)} <span style="color:var(--text3);font-size:11px">${pkEsc(m.tip||'')}</span></label>`).join('')||'<span style="color:var(--text3)">Nicio mașină</span>'}</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px"><button class="filter-btn" style="min-height:30px;padding:4px 10px" onclick="eisSelAll()">Selectează toate (${cars.length})</button><button class="filter-btn" style="min-height:30px;padding:4px 10px" onclick="eisSelNone()">Șterge selecția</button></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;max-height:320px;overflow-y:auto;margin-bottom:10px;padding:6px 2px">${cars.map(m=>{ const on=eisSel.has(m.id); const sf=String(m.sofer||'').trim(); const dt=!sf?'—':(sf.toUpperCase()==='EISELFING'?'— Eiselfing —':sf);
+        return `<div onclick="eisToggleCar(${m.id})" style="cursor:pointer;user-select:none;background:${on?'rgba(46,158,91,.12)':'var(--surface)'};border:2px solid ${on?'var(--accent)':'var(--border)'};border-radius:var(--radius);padding:10px 12px;position:relative"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px"><b style="font-family:var(--mono);font-size:14px">${pkEsc(m.nr)}</b><span style="font-size:11px;color:var(--text3)">${pkEsc(m.tip||'')}</span></div><div style="font-size:12px;color:var(--text2);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pkEsc(dt)}</div>${on?'<span style="position:absolute;top:-6px;right:-6px;background:var(--accent);color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:12px">✓</span>':''}</div>`; }).join('')||'<span style="color:var(--text3)">Nicio mașină</span>'}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">${quick}</div>
       <textarea id="eis-desc" rows="2" placeholder="ex: trebuie schimbate cauciucurile" style="width:100%;box-sizing:border-box;font-family:inherit;${inp}"></textarea>
       <div style="margin-top:8px;text-align:right"><button class="btn btn-primary" onclick="eisAdd()">Adaugă sarcina</button></div></div>`;
@@ -3000,7 +3004,7 @@ function renderEisrep(keepFocus){
   sec.innerHTML=h; const d=document.getElementById('eis-desc'); if(d&&val) d.value=val;
   if(keepFocus&&fe==='eis-q'){ const i=document.getElementById('eis-q'); if(i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } }
 }
-window.eisToggleCar=eisToggleCar; window.eisSetQ=eisSetQ; window.eisSetView=eisSetView; window.eisQuick=eisQuick; window.eisAdd=eisAdd; window.eisDelete=eisDelete; window.eisOpenDone=eisOpenDone; window.eisCloseDone=eisCloseDone; window.eisFinalize=eisFinalize; window.renderEisrep=renderEisrep;
+window.eisSelAll=eisSelAll; window.eisSelNone=eisSelNone; window.eisToggleCar=eisToggleCar; window.eisSetQ=eisSetQ; window.eisSetView=eisSetView; window.eisQuick=eisQuick; window.eisAdd=eisAdd; window.eisDelete=eisDelete; window.eisOpenDone=eisOpenDone; window.eisCloseDone=eisCloseDone; window.eisFinalize=eisFinalize; window.renderEisrep=renderEisrep;
 document.addEventListener('input', e=>{ if(e.target.id==='eis-done-km') e.target.style.borderColor=''; });
 
 // ── REPARAȚII ÎN COLECȚIE SEPARATĂ: flota_reparatii/{id} ────────────────────────────
@@ -7457,7 +7461,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261106-145232';
+const APP_VERSION='20261106-151727';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
