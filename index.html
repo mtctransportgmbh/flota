@@ -2836,14 +2836,17 @@ function curDriverAt(m,iso){
   log.forEach(l=>{ if(l.nr!==m.nr||!l.preluat) return; const a=new Date(l.preluat).getTime(), b=l.restituit?new Date(l.restituit).getTime():Infinity; if(a<t1&&b>=t0&&(!best||a>best.a)) best={a,s:l.sofer}; });
   return best?best.s:(m.sofer||'');
 }
+// Cine vede ce la Curățenie: admin = tot; Eiselfing = doar Eiselfing; ceilalți useri = doar Ruhstorf; Paketshop = doar admin
+function curAllowedLocs(){ if(isAdminUser) return PC_LOCATIONS; if(isEiselfingUser()) return ['Eiselfing']; return ['Ruhstorf']; }
+function curVisIds(){ const al=curAllowedLocs(); return new Set(masini.filter(m=>al.includes(pcLocationOf(m))).map(m=>m.id)); }
 function curCanEdit(iso){ return isAdminUser || iso===curTodayISO(); }
 function curCars(){
-  const vis=new Set(visibleMasini().map(m=>m.id)); const out=[];
-  PC_LOCATIONS.forEach(loc=>{ if(curLoc!=='all'&&curLoc!==loc) return; const cs=pcCars(loc,false).filter(m=>vis.has(m.id)); if(cs.length) out.push({loc,cars:cs}); });
+  const vis=curVisIds(); const out=[];
+  curAllowedLocs().forEach(loc=>{ if(curLoc!=='all'&&curLoc!==loc) return; const cs=pcCars(loc,false).filter(m=>vis.has(m.id)); if(cs.length) out.push({loc,cars:cs}); });
   return out;
 }
 function curAnalyze(){
-  const vis=new Set(visibleMasini().map(m=>m.id));
+  const vis=curVisIds();
   const all=Object.values(curData).filter(x=>vis.has(x.m)).sort((a,b)=>a.d.localeCompare(b.d)||String(a.t||'').localeCompare(String(b.t||'')));
   const byCar={}, byPer={};
   all.forEach(x=>{ (byCar[x.m]=byCar[x.m]||[]).push(x); if(curIsPerson(x.s)) (byPer[x.s]=byPer[x.s]||[]).push(x); });
@@ -2883,12 +2886,12 @@ function renderCurat(){
   const names=soferi.map(x=>typeof x==='string'?x:x.name).filter(curIsPerson).sort((a,b)=>String(a).localeCompare(String(b)));
   const warnC=A.cars.filter(c=>c.streak>=3).sort((a,b)=>b.streak-a.streak), warnP=A.pers.filter(p=>p.streak>=3).sort((a,b)=>b.streak-a.streak);
   const warnSet=new Set(warnC.map(c=>c.id));
-  const locBtns=(isEiselfingUser()?[]:['all',...PC_LOCATIONS]).map(l=>`<button class="filter-btn${curLoc===l?' active':''}" onclick="curSetLoc('${l}')">${l==='all'?'Toate':l}</button>`).join('');
+  const locBtns=(isAdminUser?['all',...PC_LOCATIONS]:[]).map(l=>`<button class="filter-btn${curLoc===l?' active':''}" onclick="curSetLoc('${l}')">${l==='all'?'Toate':l}</button>`).join('');
   let h=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
     <input type="date" value="${iso}" max="${today}" ${isAdminUser?'':'disabled'} onchange="curSetDate(this.value)" style="background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);padding:8px 10px;font-family:var(--mono)">
     ${iso!==today?`<button class="filter-btn" onclick="curSetDate('${today}')">Azi</button>`:''}${locBtns}
     <button class="filter-btn" onclick="curToggleStat()" style="margin-left:auto">📊 Statistică ${curShowStat?'▲':'▼'}</button>
-    ${isEiselfingUser()?'':`<button class="filter-btn" onclick="openPrintCheck()">🖨 Listă verificare</button>`}</div>`;
+    ${!isAdminUser?'':`<button class="filter-btn" onclick="openPrintCheck()">🖨 Listă verificare</button>`}</div>`;
   if(isAdminUser&&iso!==today) h+=`<div style="background:rgba(214,138,0,.12);border:1px solid rgba(214,138,0,.4);border-radius:var(--radius);padding:8px 12px;font-size:12px;margin-bottom:12px">📅 Adaugi pentru <b>${iso.split('-').reverse().join('.')}</b> (din trecut). Alege șoferul care conducea atunci, apoi Curat / Murdar.</div>`;
   if(warnC.length||warnP.length){
     h+=`<div style="background:rgba(255,90,90,.08);border:1px solid rgba(255,90,90,.35);border-radius:var(--radius);padding:12px 14px;margin-bottom:14px;font-size:13px"><b style="color:var(--danger)">⚠ Avertizări curățenie</b>`
@@ -7461,7 +7464,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261106-151727';
+const APP_VERSION='20261106-152053';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
