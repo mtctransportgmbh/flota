@@ -246,6 +246,11 @@ body.user-mode .card-actions {
 body.eis-mode .card-actions{display:flex !important;}
 body.eis-mode .card-actions .icon-btn{display:inline-block !important;}
 body.eis-mode #modal-edit .btn-danger{display:none !important;}
+/* Excepție: mecanicii (Ioan/Vasile) pot corecta km/date la reparațiile din Istoric și din „în curs" */
+body.srv-mecanic #srv-istoric-section .card-actions,
+body.srv-mecanic #srv-active-section .card-actions{display:flex !important;}
+body.srv-mecanic #srv-istoric-section .card-actions .icon-btn,
+body.srv-mecanic #srv-active-section .card-actions .icon-btn{display:inline-block !important;}
 /* Excepție: cine poate edita stocul (admin, Cristi, Mihai) vede butoanele din Stoc */
 body.stoc-editor #stoc-add-btn{display:inline-block !important;}
 body.stoc-editor #stoc-section .icon-btn{display:inline-block !important;}
@@ -6527,6 +6532,9 @@ function renderSrvTaskuri(){
       if(canComplete){
         actions += `<button onclick="srvOpenComplete(${t.id})" style="background:var(--accent);border:none;color:#fff;cursor:pointer;font-size:12px;padding:8px 14px;border-radius:4px;font-weight:500;font-family:inherit">✓ Marchează finalizată</button>`;
       }
+      if(t.status === 'done' && (sef || (currentUser && (t.asignat === currentUser.username || t.completedByUsername === currentUser.username)))){
+        actions += `<button onclick="srvEditDoneTask(${t.id})" style="background:none;border:1px solid var(--border2);color:var(--text2);cursor:pointer;font-size:12px;padding:7px 12px;border-radius:4px;font-family:inherit">✎ Corectează km / detalii</button>`;
+      }
       if(t.status === 'accepted' && isMine){
         actions += `<button onclick="srvEditWork(${t.id})" style="background:none;border:1px solid var(--border2);color:var(--text2);cursor:pointer;font-size:12px;padding:7px 12px;border-radius:4px;font-family:inherit">✎ Editează lucrarea</button>`;
       }
@@ -7174,6 +7182,15 @@ function srvEditWork(taskId){
   srvOpenEdit(rep.id);
 }
 window.srvEditWork = srvEditWork;
+function srvEditDoneTask(taskId){
+  const t = taskuri.find(x=>x.id===taskId);
+  if(!t) return;
+  const rep = reparatii.find(r => r.fromTaskId === taskId);
+  if(!rep){ toast('Nu există reparație legată de această sarcină'); return; }
+  srvOpenEdit(rep.id);
+}
+window.srvEditDoneTask = srvEditDoneTask;
+
 function srvOpenEdit(id){
   const r = reparatii.find(x=>x.id===id);
   if(!r){ toast('Reparație negăsită'); return; }
@@ -7464,7 +7481,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261106-152053';
+const APP_VERSION='20261107-072837';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
