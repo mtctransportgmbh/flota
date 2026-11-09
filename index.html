@@ -619,6 +619,7 @@ body.user-mode .log-mobile-card {
     <div class="log-toolbar">
       <input id="log-search" placeholder="caută în log..." oninput="renderLog()">
       <button class="btn-add-log" onclick="openAddLog()">+ Adaugă schimbare</button>
+      <button class="btn-add-log" id="btn-fix-log" onclick="logFixDoubleActive()" style="display:none;background:var(--surface);color:var(--text2);border:1px solid var(--border2)" title="Închide intrările rămase ACTIVE când există o intrare mai nouă pe aceeași mașină">🧹 Repară active duble</button>
     </div>
     <div class="log-wrap">
       <div class="log-table">
@@ -3451,6 +3452,7 @@ function confirmDriver(){
 
 // ── LOG ──────────────────────────────────────────────────────────────
 function renderLog(){
+  { const _fb=document.getElementById('btn-fix-log'); if(_fb) _fb.style.display=isAdminUser?'':'none'; }
   const q=(document.getElementById('log-search')?.value||'').toLowerCase();
   const sorted=log.slice().sort((a,b)=>(b.preluat?.getTime()||0)-(a.preluat?.getTime()||0));
   const _vn=isEiselfingUser()?visibleNrSet():null;
@@ -3525,6 +3527,28 @@ function openEditLog(id){
   document.getElementById('modal-log').classList.add('open');
 }
 function closeModalLog(){document.getElementById('modal-log').classList.remove('open');editingLogId=null;}
+// O mașină are la un moment dat UN SINGUR șofer: o intrare mai veche rămasă ACTIVĂ (sau care se suprapune)
+// se închide la momentul preluării intrării următoare. Nu atinge golurile (restituit mai devreme decât următoarea preluare).
+function logNormalizeCar(nr){
+  const arr=log.filter(l=>(l.nr||'')===nr && l.preluat && !isNaN(new Date(l.preluat).getTime()))
+    .sort((a,b)=>(new Date(a.preluat)-new Date(b.preluat))||((a.id||0)-(b.id||0)));
+  let n=0;
+  for(let i=0;i<arr.length-1;i++){
+    const cur=arr[i], nxt=arr[i+1], ns=new Date(nxt.preluat);
+    if(!cur.restituit || new Date(cur.restituit)>ns){
+      cur.restituit=new Date(ns); cur.restituitBy=currentUser?.name||'sistem'; cur.restituitByUsername=currentUser?.username||''; n++;
+    }
+  }
+  return n;
+}
+function logFixDoubleActive(){
+  if(!isAdminUser){ toast('Doar adminul'); return; }
+  const nrs=[...new Set(log.filter(l=>!l.restituit).map(l=>l.nr))].filter(nr=>log.filter(l=>l.nr===nr&&!l.restituit).length>1);
+  if(!nrs.length){ toast('Nu există mașini cu mai multe intrări ACTIVE'); return; }
+  if(!confirm('Mașini cu mai multe intrări ACTIVE: '+nrs.length+'\n'+nrs.slice(0,15).join(', ')+(nrs.length>15?'…':'')+'\n\nÎnchid intrările mai vechi la momentul preluării celei următoare. Continui?')) return;
+  let tot=0; nrs.forEach(nr=>{ tot+=logNormalizeCar(nr); });
+  saveToCloud(); renderAll(); toast('✓ '+tot+' intrări închise');
+}
 function saveLog(){
   const l=log.find(x=>x.id===editingLogId);if(!l)return;
   l.nr=document.getElementById('ml-nr').value.trim();
@@ -3535,6 +3559,7 @@ function saveLog(){
   l.restituit=r?_validDt(r,l.restituit||null):null;
   l.editedBy = currentUser?.name || 'unknown';
   l.editedAt = new Date().toISOString();
+  logNormalizeCar(l.nr);
   closeModalLog();
   saveToCloud();
   renderAll();
@@ -3590,6 +3615,7 @@ function saveAddLog(){
     addedBy: userName,
     addedAt: new Date().toISOString()
   });
+  logNormalizeCar(nr);
   closeModalAddLog();
   saveToCloud();
   renderAll();
@@ -7509,7 +7535,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261109-113329';
+const APP_VERSION='20261109-113652';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
