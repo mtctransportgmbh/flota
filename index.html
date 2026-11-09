@@ -1763,6 +1763,36 @@ if (!firebaseConfig || !firebaseConfig.apiKey) {
 <!-- ── LOGICA APP ────────────────────────────────────────────── -->
 <!-- ──────────────────────────────────────────────────────────── -->
 <script>
+// ── AVERTIZARE LA ERORI: dacă ceva nu merge, userul vede un mesaj clar și știe să anunțe adminul ──
+(function(){
+  const seen={}; let shown=0;
+  function show(msg,src){
+    try{
+      const txt=String(msg||'');
+      if(/ResizeObserver|^Script error\.?$|chrome-extension|moz-extension|safari-extension/i.test(txt+' '+String(src||''))) return;
+      const key=txt.slice(0,120), now=Date.now();
+      if(seen[key] && now-seen[key]<60000) return; seen[key]=now;
+      if(++shown>6) return;
+      let v='?', who='?';
+      try{ v=APP_VERSION; }catch(e){}
+      try{ who=currentUser.name; }catch(e){}
+      const det='Flotă '+v+' · '+who+' · '+new Date().toLocaleString('ro-RO')+' · '+txt.slice(0,220);
+      const old=document.getElementById('err-banner'); if(old) old.remove();
+      const b=document.createElement('div'); b.id='err-banner';
+      b.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:99998;background:#7c2d12;color:#fff;padding:12px 14px;border-radius:10px;font-size:13px;line-height:1.45;box-shadow:0 6px 24px rgba(0,0,0,.45);max-width:560px;margin:0 auto';
+      const h=document.createElement('div'); h.innerHTML='<b>⚠️ Ceva nu a funcționat corect.</b> Dacă o acțiune nu s-a făcut sau nu apare, <b>fă un screenshot și anunță adminul</b> (Paul).';
+      const d=document.createElement('div'); d.style.cssText='font-size:11px;opacity:.85;margin-top:5px;word-break:break-word'; d.textContent=det;
+      const row=document.createElement('div'); row.style.cssText='margin-top:8px;display:flex;gap:8px';
+      const bs='background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer';
+      const c=document.createElement('button'); c.style.cssText=bs; c.textContent='Copiază detaliile'; c.onclick=()=>{ try{ navigator.clipboard.writeText(det); c.textContent='Copiat ✓'; }catch(e){ c.textContent='Nu s-a putut copia'; } };
+      const x=document.createElement('button'); x.style.cssText=bs; x.textContent='Închide'; x.onclick=()=>b.remove();
+      row.append(c,x); b.append(h,d,row); document.body.appendChild(b);
+    }catch(e){}
+  }
+  window.addEventListener('error',e=>show(e&&e.message,e&&e.filename));
+  window.addEventListener('unhandledrejection',e=>{ const r=e&&e.reason; show((r&&(r.code?r.code+': ':'')+(r.message||r))||'promisiune respinsă',''); });
+})();
+
 // ── STATE ────────────────────────────────────────────────────────────
 let masini=[], soferi=[], log=[];
 let carIdCtr=1, logIdCtr=1;
@@ -7535,7 +7565,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261109-113652';
+const APP_VERSION='20261109-114118';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
