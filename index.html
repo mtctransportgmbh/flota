@@ -621,6 +621,7 @@ body.user-mode .log-mobile-card {
       <button class="btn-add-log" onclick="openAddLog()">+ Adaugă schimbare</button>
       <button class="btn-add-log" id="btn-fix-log" onclick="logFixDoubleActive()" style="display:none;background:var(--surface);color:var(--text2);border:1px solid var(--border2)" title="Închide intrările rămase ACTIVE când există o intrare mai nouă pe aceeași mașină">🧹 Repară active duble</button>
   <button class="btn-add-log" id="btn-sync-log" onclick="logSyncDrivers()" style="display:none;background:var(--surface);color:var(--text2);border:1px solid var(--border2)" title="Verifică dacă șoferul mașinii coincide cu logul activ">🔄 Sincronizează șoferii</button>
+  <button class="btn-add-log" id="btn-audit-log" onclick="logAuditOpen()" style="display:none;background:var(--surface);color:var(--text2);border:1px solid var(--border2)" title="Cine a șters ce și când">📜 Jurnal ștergeri</button>
     </div>
     <div class="log-wrap">
       <div class="log-table">
@@ -1737,6 +1738,8 @@ if (!firebaseConfig || !firebaseConfig.apiKey) {
     curRef: (id) => doc(db, "flota_curatenie", String(id)),
     eisColl: () => collection(db, "flota_eis_tasks"),
     eisRef: (id) => doc(db, "flota_eis_tasks", String(id)),
+    audColl: () => collection(db, "flota_audit"),
+    audRef: (id) => doc(db, "flota_audit", String(id)),
     rawDelete: deleteDoc,
     batch: () => writeBatch(db)
   };
@@ -2816,12 +2819,13 @@ function _mergeKeyed(name, remote, local){
       } else out.set(k,x);
     } else if(b!==_st(x)) out.set(k,x);
   });
-  baseM.forEach((_,k)=>{ if(!localKeys.has(k)) out.delete(k); });
+  baseM.forEach((v,k)=>{ if(!localKeys.has(k)){ if(out.has(k)) (window._mergeDeleted=window._mergeDeleted||[]).push({a:name,k:String(k),s:String(v).slice(0,1500)}); out.delete(k); } });
   return [...out.values()];
 }
 function _mergeDoc(remote, payload){
   const merged={...remote, ...payload};
   if(window._repColl){ delete merged.reparatii; merged.repIdCtr=Math.max(remote.repIdCtr||1, payload.repIdCtr||1, ...reparatii.map(r=>typeof r.id==='number'?r.id+1:0)); }
+  merged.clientSchema=2;   // marcaj: regulile Firestore resping scrierile de la versiuni vechi ale aplicației (ar suprascrie datele cu liste vechi)
   merged.flotaBackupuri=[];   // copiile din document au fost înlocuite de backup-urile din bucket — nu se mai păstrează
   Object.keys(_KEYED).forEach(n=>{
     if(!(n in payload)) return;
@@ -2858,11 +2862,19 @@ window._noUndef=_noUndef;
 window.mergeSetDoc=async function(ref, payload){
   const H=window.fbHelpers;
   await saveRepDiff();   // reparațiile (colecție separată) — doar ce s-a schimbat
+  let _del=[];
   await H.runTransaction(window.fbDb, async tx=>{
     const snap=await tx.get(ref);
     const remote=snap.exists()?snap.data():{};
+    window._mergeDeleted=[];
     tx.set(ref, _noUndef(_mergeDoc(remote, payload)));
+    _del=window._mergeDeleted.slice();
   });
+  // jurnal de ștergeri: cine a șters ce și când (colecția flota_audit; nu poate fi modificat sau șters din aplicație)
+  if(_del.length){ try{
+    const id=new Date().toISOString().replace(/\D/g,'').slice(0,17)+'_'+Math.random().toString(36).slice(2,6);
+    await H.rawSetDoc(H.audRef(id), {ts:new Date().toISOString(), by:(currentUser&&currentUser.name)||'?', username:(currentUser&&currentUser.username)||'', ver:APP_VERSION, n:_del.length, items:_del.slice(0,60)});
+  }catch(e){ console.warn('jurnal ștergeri nesalvat', e&&e.code); } }
   // baseline = ce știm acum că e în cloud din partea noastră
   const nb=_serialLocal(); Object.keys(payload).forEach(k=>{ if(k in nb) nb[k]=payload[k]; });
   _setBaseline(nb);
@@ -3151,6 +3163,15 @@ function saveToCloud(){
     _saveFailed=true; _saveBanner('❌ Salvarea a fost BLOCATĂ (lista de mașini apare goală în memorie). Reîncarcă pagina (Ctrl+F5) înainte să mai introduci ceva.','fail');
     return;
   }
+  // Protecție: dacă salvarea ar șterge mai mult de 5 elemente dintr-o listă, cere confirmare (și face backup înainte)
+  try{
+    const big=[]; const loc={masini,log,soferi,stoc,stocLog,garantii,taskuri};
+    Object.keys(loc).forEach(n=>{ const b=_base&&_base[n]; if(!b||!b.size) return; const ks=new Set((loc[n]||[]).map(x=>_kf(x,_KEYED[n]))); let c=0; b.forEach((_,k)=>{ if(!ks.has(k)) c++; }); if(c>5) big.push(n+': '+c); });
+    if(big.length && !window._bulkConfirmed){
+      if(!confirm('⚠️ ATENȚIE: această salvare ar ȘTERGE multe elemente din cloud ('+big.join(', ')+').\n\nDacă n-ai șters tu intenționat, apasă Anulare — se reîncarcă pagina cu datele din cloud.\n\nOK = șterg, Anulare = renunț.')){ location.reload(); return; }
+      try{ flotaBackupAuto('Înainte de ștergere în masă ('+big.join(', ')+') — '+(currentUser&&currentUser.name)); }catch(e){}
+    }
+  }catch(eg){ console.warn('guard',eg); }
   clearTimeout(saveTimer);
   savePending=true;
   saveTimer=setTimeout(async ()=>{
@@ -3492,7 +3513,7 @@ function confirmDriver(){
 
 // ── LOG ──────────────────────────────────────────────────────────────
 function renderLog(){
-  { ['btn-fix-log','btn-sync-log'].forEach(id=>{ const _fb=document.getElementById(id); if(_fb) _fb.style.display=isAdminUser?'':'none'; }); }
+  { ['btn-fix-log','btn-sync-log','btn-audit-log'].forEach(id=>{ const _fb=document.getElementById(id); if(_fb) _fb.style.display=isAdminUser?'':'none'; }); }
   const q=(document.getElementById('log-search')?.value||'').toLowerCase();
   const sorted=log.slice().sort((a,b)=>(b.preluat?.getTime()||0)-(a.preluat?.getTime()||0));
   const _vn=isEiselfingUser()?visibleNrSet():null;
@@ -3590,6 +3611,21 @@ function logFixDoubleActive(){
   saveToCloud(); renderAll(); toast('✓ '+tot+' intrări închise');
 }
 // Șoferul „curent” al mașinii (masini[].sofer) trebuie să fie același cu intrarea ACTIVĂ din log (cea mai nouă fără restituire); fără intrare activă = liber ('').
+function logAuditOpen(){
+  if(!isAdminUser){ toast('Doar adminul'); return; }
+  const esc=x=>String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const H=window.fbHelpers; let un=null, done=false;
+  toast('Se încarcă jurnalul…');
+  un=H.onSnapshot(H.audColl(), snap=>{
+    if(done) return; done=true; try{ un&&un(); }catch(e){}
+    const rows=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.ts<b.ts?1:-1)).slice(0,120);
+    const nm={log:'Log',masini:'Mașină',soferi:'Șofer',stoc:'Stoc',stocLog:'Istoric stoc',garantii:'Garanție',taskuri:'Sarcină',knownUsers:'Utilizator'};
+    const lab=it=>{ let o={}; try{ o=JSON.parse(it.s); }catch(e){} return (nm[it.a]||it.a)+': '+[o.nr||o.nume||o.name||it.k, o.sofer, o.preluat?String(o.preluat).slice(0,10):''].filter(Boolean).join(' · '); };
+    const html=rows.length?rows.map(r=>'<div style="padding:8px 4px;border-bottom:1px solid var(--border2);font-size:12.5px"><b>'+new Date(r.ts).toLocaleString('ro-RO')+'</b> · '+esc(r.by||'?')+' · <span style="color:var(--danger)">'+r.n+' șterse</span>'+(r.items||[]).slice(0,8).map(it=>'<div style="color:var(--text2);margin-left:8px">• '+esc(lab(it))+'</div>').join('')+((r.items||[]).length>8?'<div style="color:var(--text3);margin-left:8px">… +'+((r.items||[]).length-8)+'</div>':'')+'</div>').join(''):'<div style="padding:16px;color:var(--text2)">Nicio ștergere înregistrată încă.</div>';
+    let ov=document.getElementById('aud-ov'); if(!ov){ ov=document.createElement('div'); ov.id='aud-ov'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px'; document.body.appendChild(ov); }
+    ov.innerHTML='<div style="background:var(--surface);color:var(--text);border-radius:12px;max-width:620px;width:100%;max-height:85vh;display:flex;flex-direction:column"><div style="padding:14px 16px;font-weight:700;border-bottom:1px solid var(--border2)">📜 Jurnal ștergeri (ultimele 120)</div><div style="overflow:auto;padding:6px 12px">'+html+'</div><div style="padding:10px 16px;text-align:right"><button onclick="document.getElementById(\'aud-ov\').remove()" style="padding:7px 16px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--text);cursor:pointer">Închide</button></div></div>';
+  }, err=>{ done=true; toast('Jurnalul nu e disponibil (reguli nepublicate?)'); });
+}
 function logSyncMismatches(){
   const out=[];
   masini.forEach(m=>{
@@ -7605,7 +7641,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261109-131943';
+const APP_VERSION='20261109-132653';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
