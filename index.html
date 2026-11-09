@@ -620,6 +620,7 @@ body.user-mode .log-mobile-card {
       <input id="log-search" placeholder="caută în log..." oninput="renderLog()">
       <button class="btn-add-log" onclick="openAddLog()">+ Adaugă schimbare</button>
       <button class="btn-add-log" id="btn-fix-log" onclick="logFixDoubleActive()" style="display:none;background:var(--surface);color:var(--text2);border:1px solid var(--border2)" title="Închide intrările rămase ACTIVE când există o intrare mai nouă pe aceeași mașină">🧹 Repară active duble</button>
+  <button class="btn-add-log" id="btn-sync-log" onclick="logSyncDrivers()" style="display:none;background:var(--surface);color:var(--text2);border:1px solid var(--border2)" title="Verifică dacă șoferul mașinii coincide cu logul activ">🔄 Sincronizează șoferii</button>
     </div>
     <div class="log-wrap">
       <div class="log-table">
@@ -3491,7 +3492,7 @@ function confirmDriver(){
 
 // ── LOG ──────────────────────────────────────────────────────────────
 function renderLog(){
-  { const _fb=document.getElementById('btn-fix-log'); if(_fb) _fb.style.display=isAdminUser?'':'none'; }
+  { ['btn-fix-log','btn-sync-log'].forEach(id=>{ const _fb=document.getElementById(id); if(_fb) _fb.style.display=isAdminUser?'':'none'; }); }
   const q=(document.getElementById('log-search')?.value||'').toLowerCase();
   const sorted=log.slice().sort((a,b)=>(b.preluat?.getTime()||0)-(a.preluat?.getTime()||0));
   const _vn=isEiselfingUser()?visibleNrSet():null;
@@ -3587,6 +3588,35 @@ function logFixDoubleActive(){
   if(!confirm('Mașini cu mai multe intrări ACTIVE: '+nrs.length+'\n'+nrs.slice(0,15).join(', ')+(nrs.length>15?'…':'')+'\n\nÎnchid intrările mai vechi la momentul preluării celei următoare. Continui?')) return;
   let tot=0; nrs.forEach(nr=>{ tot+=logNormalizeCar(nr); });
   saveToCloud(); renderAll(); toast('✓ '+tot+' intrări închise');
+}
+// Șoferul „curent” al mașinii (masini[].sofer) trebuie să fie același cu intrarea ACTIVĂ din log (cea mai nouă fără restituire); fără intrare activă = liber ('').
+function logSyncMismatches(){
+  const out=[];
+  masini.forEach(m=>{
+    const act=log.filter(l=>l.nr===m.nr && !l.restituit && l.preluat && !isNaN(new Date(l.preluat).getTime()))
+      .sort((x,y)=>(new Date(y.preluat)-new Date(x.preluat))||((y.id||0)-(x.id||0)))[0];
+    const logS=act?String(act.sofer||'').trim():'', carS=String(m.sofer||'').trim();
+    if(logS!==carS) out.push({m,act,logS,carS});
+  });
+  return out;
+}
+function logSyncDrivers(){
+  if(!isAdminUser){ toast('Doar adminul'); return; }
+  const mm=logSyncMismatches();
+  if(!mm.length){ toast('✓ Șoferii din mașini și din log coincid'); return; }
+  const list=mm.slice(0,25).map(x=>x.m.nr+':  mașină = '+(x.carS||'(liber)')+'   |   log = '+(x.logS||'(fără intrare activă)')).join('\n')+(mm.length>25?'\n… +'+(mm.length-25)+' altele':'');
+  if(confirm('Nepotriviri între șoferul mașinii și logul activ: '+mm.length+'\n\n'+list+'\n\nOK = aliniez MAȘINA după LOG (șoferul din log e cel corect).\nAnulare = alte opțiuni.')){
+    mm.forEach(x=>{ x.m.sofer=x.logS; if(sk(x.logS)!=='STRICATA') delete x.m.strOrigin; });
+    saveToCloud(); renderAll(); toast('✓ '+mm.length+' mașini aliniate după log'); return;
+  }
+  if(confirm('Aliniez invers: LOGUL după MAȘINĂ (șoferul mașinii e cel corect)?\n\nSe închide intrarea activă greșită și se deschide una nouă cu șoferul mașinii, la momentul de acum.\n\nOK = aliniez logul după mașină.  Anulare = nu fac nimic.')){
+    const now=new Date(), by=currentUser?.name||'sistem', byu=currentUser?.username||'';
+    mm.forEach(x=>{
+      log.filter(l=>l.nr===x.m.nr && !l.restituit).forEach(l=>{ l.restituit=new Date(now); l.restituitBy=by; l.restituitByUsername=byu; });
+      if(x.carS) log.push({id:logIdCtr++,nr:x.m.nr,tip:x.m.tip,sofer:x.carS,preluat:new Date(now),restituit:null,preluatBy:by,preluatByUsername:byu,addedBy:by,addedAt:now.toISOString()});
+    });
+    saveToCloud(); renderAll(); toast('✓ '+mm.length+' intrări de log aliniate după mașină');
+  }
 }
 function saveLog(){
   const l=log.find(x=>x.id===editingLogId);if(!l)return;
@@ -7575,7 +7605,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261109-123859';
+const APP_VERSION='20261109-131943';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
