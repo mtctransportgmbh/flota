@@ -3130,6 +3130,15 @@ function _saveBanner(msg,kind){
   b.textContent=msg; _saveBannerKind=kind||'warn';
 }
 window.addEventListener('beforeunload',e=>{ if(savePending||isSaving||_saveFailed){ e.preventDefault(); e.returnValue=''; } });
+// Indicator mic, mereu vizibil: arata daca ultima modificare chiar a ajuns in cloud (si cand)
+function _saveChip(ok){
+  try{
+    let c=document.getElementById('save-chip');
+    if(!c){ c=document.createElement('div'); c.id='save-chip'; c.style.cssText='position:fixed;left:8px;bottom:8px;z-index:99990;font-size:11px;padding:4px 10px;border-radius:12px;font-family:var(--mono,monospace);pointer-events:none'; document.body.appendChild(c); }
+    if(ok){ const d=new Date(); c.textContent='☁ Salvat în cloud · '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); c.style.background='rgba(16,120,70,.85)'; c.style.color='#fff'; }
+    else { c.textContent='☁ NESALVAT — anunță adminul'; c.style.background='#b91c1c'; c.style.color='#fff'; }
+  }catch(e){}
+}
 let savePending=false;
 let _saveRetryTimer=null;
 let saveTimer=null;
@@ -3181,12 +3190,12 @@ function saveToCloud(){
     try{
       { const _P=window._noUndef(payload), _sz=JSON.stringify(_P).length; if(_sz>700000){ const parts=Object.keys(_P).map(k=>[k,JSON.stringify(_P[k]).length]).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]+' '+Math.round(x[1]/1024)+' KB').join(', '); _saveBanner('⚠ Documentul flotei are '+Math.round(_sz/1024)+' KB și se apropie de limita Firestore (1024 KB). Cele mai mari: '+parts+'. Anunță adminul.'); } else if(_saveBannerKind==='warn') _saveBanner(null); }
       await window.fbHelpers.setDoc(window.fbDocRef, window._noUndef(payload));
-      isSaving=false; _saveFailed=false; if(_saveBannerKind==='fail') _saveBanner(null);
+      isSaving=false; _saveFailed=false; if(_saveBannerKind==='fail') _saveBanner(null); _saveChip(true);
       repFlushPending();
       if(window._toastOnSave){ window._toastOnSave=false; toast('✓ Salvat în cloud'); }
     } catch(e){
       console.error('Save failed:', e);
-      isSaving=false; _saveFailed=true;
+      isSaving=false; _saveFailed=true; _saveChip(false);
       _saveBanner('❌ Modificările NU sunt salvate ('+((e&&e.message)||'eroare')+'). NU închide pagina — se reîncearcă automat. Dacă rămâne așa, anunță adminul.','fail');
       const offline = !navigator.onLine || /offline|unavailable|network/i.test(e.message||'');
       toast(offline ? 'Fără conexiune — salvarea se reia automat' : 'Salvare eșuată — '+e.message+' (reîncerc)');
@@ -3195,7 +3204,7 @@ function saveToCloud(){
     }
     }catch(e0){
       console.error('Save build failed:', e0);
-      isSaving=false; _saveFailed=true;
+      isSaving=false; _saveFailed=true; _saveChip(false);
       _saveBanner('❌ Modificările NU sunt salvate (eroare internă: '+((e0&&e0.message)||'necunoscută')+'). NU închide pagina — anunță adminul.','fail');
       clearTimeout(_saveRetryTimer);
       _saveRetryTimer=setTimeout(()=>saveToCloud(), 8000);
@@ -5315,7 +5324,7 @@ function bkmStartModule(){
 function bkmModChanged(){
   const m=BKM.cfg.modules.find(x=>x.id===document.getElementById('bkm-mod').value);
   document.getElementById('bkm-hint').textContent=m.hint||'';
-  document.getElementById('bkm-mode').innerHTML='<option value="all">Tot modulul (toate elementele)</option>'+(m.items!==false?'<option value="items">Doar anumite elemente</option>':'')+m.fieldsets.map(f=>'<option value="fs:'+bkmEsc(f.id)+'">'+bkmEsc(f.label)+'</option>').join('');
+  document.getElementById('bkm-mode').innerHTML='<option value="all">Tot modulul (toate elementele)</option>'+(m.missingOk?'<option value="missing">✅ Doar ce lipsește acum (recreează, nu modifică nimic)</option>':'')+(m.items!==false?'<option value="items">Doar anumite elemente</option>':'')+m.fieldsets.map(f=>'<option value="fs:'+bkmEsc(f.id)+'">'+bkmEsc(f.label)+'</option>').join('');
   document.getElementById('bkm-items').innerHTML='';
 }
 async function bkmModeChanged(){
@@ -5328,6 +5337,7 @@ async function bkmModeChanged(){
 function bkmGoModule(){
   const mod=document.getElementById('bkm-mod').value, mode=document.getElementById('bkm-mode').value;
   if(mode==='all') return bkmPreview({module:mod,mode:'all'});
+  if(mode==='missing') return bkmPreview({module:mod,mode:'missing'});
   if(mode.startsWith('fs:')) return bkmPreview({module:mod,mode:'fieldset',fieldset:mode.slice(3)});
   const sel=Array.from(document.querySelectorAll('input[name="bkm-sel"]:checked')).map(i=>BKM.list[+i.value]);
   if(!sel.length){ toast('Alege cel puțin un element'); return; }
@@ -7565,7 +7575,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261109-114118';
+const APP_VERSION='20261109-123859';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
