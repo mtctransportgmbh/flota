@@ -2349,7 +2349,7 @@ function startSync(){
     if(snap.exists()){
       const d=snap.data();
       // Cât timp avem modificări nesalvate, nu suprascriem memoria locală (salvarea face merge)
-      if(savePending || isSaving){ document.getElementById('loading').style.display='none'; return; }
+      if(savePending || isSaving || (_saveFailed && masini.length>0)){ document.getElementById('loading').style.display='none'; return; }
       lastSnapshotData=JSON.stringify(d);
       hydrateFromCloud(d);
     } else {
@@ -2737,6 +2737,9 @@ function seedInitialData(){
 // versiune primită (adăugat / modificat / șters).
 const _KEYED={masini:'id',log:'id',reparatii:'id',taskuri:'id',stoc:'id',stocLog:'id',garantii:'id',backupuri:'id',flotaBackupuri:'id',soferi:'name',knownUsers:'username'};
 const _CTR={masini:'carIdCtr',log:'logIdCtr',reparatii:'repIdCtr',taskuri:'taskIdCtr',stoc:'stocIdCtr',stocLog:'stocLogIdCtr',garantii:'garantiiIdCtr',backupuri:'backupIdCtr',flotaBackupuri:'flotaBackupIdCtr'};
+// Data valida -> ISO, altfel null. O data invalida (ex. camp de data gol) NU mai opreste salvarea (toISOString() arunca eroare si bloca TOATE salvarile din sesiune)
+function _iso(d){ if(!d) return null; const t=(d instanceof Date)?d.getTime():new Date(d).getTime(); return isNaN(t)?null:new Date(t).toISOString(); }
+function _validDt(v, fallback){ const d=new Date(v); return isNaN(d.getTime()) ? (fallback===undefined ? new Date() : fallback) : d; }
 let _base={};   // ultima stare cunoscută din cloud: {cheie: Map(id -> json)} + admins/forcedLogouts
 function _st(o){
   return JSON.stringify(o,(k,v)=>(v&&typeof v==='object'&&!Array.isArray(v))?Object.keys(v).sort().reduce((a,x)=>(a[x]=v[x],a),{}):v);
@@ -2745,7 +2748,7 @@ function _kf(x,idf){ return typeof x==='string'?x:(x?x[idf]:undefined); }
 function _serialLocal(){
   return {
     masini, soferi,
-    log: log.map(l=>({...l, preluat:l.preluat?l.preluat.toISOString():null, restituit:l.restituit?l.restituit.toISOString():null})),
+    log: log.map(l=>({...l, preluat:_iso(l.preluat), restituit:_iso(l.restituit)})),
     reparatii, taskuri, stoc, stocLog, garantii,
     backupuri: backupuri.map(b=>({id:b.id,timestamp:b.timestamp,triggerBy:b.triggerBy,size:b.size||0})),
     flotaBackupuri: flotaBackupuri.map(b=>({id:b.id,timestamp:b.timestamp,triggerBy:b.triggerBy,size:b.size||0,snapshot:b.snapshot||''})),
@@ -3111,13 +3114,14 @@ function saveToCloud(){
   savePending=true;
   saveTimer=setTimeout(async ()=>{
     savePending=false; isSaving=true;
+    try{
     const payload={
       masini,
       soferi,
       log: log.map(l=>({
         ...l,
-        preluat: l.preluat ? l.preluat.toISOString() : null,
-        restituit: l.restituit ? l.restituit.toISOString() : null
+        preluat: _iso(l.preluat),
+        restituit: _iso(l.restituit)
       })),
       carIdCtr,
       logIdCtr,
@@ -3155,6 +3159,13 @@ function saveToCloud(){
       _saveBanner('❌ Modificările NU sunt salvate ('+((e&&e.message)||'eroare')+'). NU închide pagina — se reîncearcă automat. Dacă rămâne așa, anunță adminul.','fail');
       const offline = !navigator.onLine || /offline|unavailable|network/i.test(e.message||'');
       toast(offline ? 'Fără conexiune — salvarea se reia automat' : 'Salvare eșuată — '+e.message+' (reîncerc)');
+      clearTimeout(_saveRetryTimer);
+      _saveRetryTimer=setTimeout(()=>saveToCloud(), 8000);
+    }
+    }catch(e0){
+      console.error('Save build failed:', e0);
+      isSaving=false; _saveFailed=true;
+      _saveBanner('❌ Modificările NU sunt salvate (eroare internă: '+((e0&&e0.message)||'necunoscută')+'). NU închide pagina — anunță adminul.','fail');
       clearTimeout(_saveRetryTimer);
       _saveRetryTimer=setTimeout(()=>saveToCloud(), 8000);
     }
@@ -3393,7 +3404,8 @@ function confirmDriver(){
   if(!pendingDriverChange)return;
   const {carId, newDriver} = pendingDriverChange;
   const _oldDriver = pendingDriverChange.oldDriver;
-  const dt = new Date(document.getElementById('md-dt').value);
+  let dt = new Date(document.getElementById('md-dt').value);
+  if(isNaN(dt.getTime())){ dt = new Date(); toast('Data/ora lipsea sau era invalidă — am folosit momentul de acum'); }
   const m = masini.find(x=>x.id===carId);
   if(!m) return;
 
@@ -3519,8 +3531,8 @@ function saveLog(){
   l.sofer=document.getElementById('ml-sofer').value;
   const p=document.getElementById('ml-preluat').value;
   const r=document.getElementById('ml-restituit').value;
-  l.preluat=p?new Date(p):null;
-  l.restituit=r?new Date(r):null;
+  l.preluat=p?_validDt(p,l.preluat||null):null;
+  l.restituit=r?_validDt(r,l.restituit||null):null;
   l.editedBy = currentUser?.name || 'unknown';
   l.editedAt = new Date().toISOString();
   closeModalLog();
@@ -3569,8 +3581,8 @@ function saveAddLog(){
     nr,
     tip:m.tip,
     sofer,
-    preluat:new Date(p),
-    restituit:r?new Date(r):null,
+    preluat:_validDt(p),
+    restituit:r?_validDt(r,null):null,
     preluatBy: userName,
     preluatByUsername: userUsername,
     restituitBy: r ? userName : null,
@@ -4004,7 +4016,7 @@ async function saveForcedLogouts(forcedLogouts){
   window._currentForcedLogouts = forcedLogouts;
   await window.fbHelpers.setDoc(window.fbDocRef, {
     masini, soferi,
-    log: log.map(l=>({...l, preluat: l.preluat?l.preluat.toISOString():null, restituit: l.restituit?l.restituit.toISOString():null})),
+    log: log.map(l=>({...l, preluat: _iso(l.preluat), restituit: _iso(l.restituit)})),
     carIdCtr, logIdCtr, admins, knownUsers,
     forcedLogouts,
     lastModifiedBy: currentUser?.name || 'admin',
@@ -4153,7 +4165,7 @@ async function initNotifications(){
         try{
           const payload = {
             masini, soferi,
-            log: log.map(l=>({...l, preluat:l.preluat?l.preluat.toISOString():null, restituit:l.restituit?l.restituit.toISOString():null})),
+            log: log.map(l=>({...l, preluat:_iso(l.preluat), restituit:_iso(l.restituit)})),
             carIdCtr, logIdCtr, admins, knownUsers,
             forcedLogouts: window._currentForcedLogouts||{},
             reparatii, repIdCtr, taskuri, taskIdCtr,
@@ -5036,7 +5048,7 @@ const _OLD_MAX_FLOTA_BACKUPS = 2; // copiile din document ocupau >500 KB (limita
 function flotaCreateSnapshot(triggerBy){
   const snap = {
     masini, soferi,
-    log: log.map(l=>({...l, preluat:l.preluat?l.preluat.toISOString():null, restituit:l.restituit?l.restituit.toISOString():null})),
+    log: log.map(l=>({...l, preluat:_iso(l.preluat), restituit:_iso(l.restituit)})),
     carIdCtr, logIdCtr, admins, knownUsers
   };
   const b = {
@@ -5062,7 +5074,7 @@ function flotaBackupAuto(triggerBy){
 
 function flotaBackupManual(){
   if(!isAdminUser){ toast('Doar adminul poate face backup'); return; }
-  const snap = { masini, soferi, log: log.map(l=>({...l, preluat:l.preluat?l.preluat.toISOString():null, restituit:l.restituit?l.restituit.toISOString():null})), carIdCtr, logIdCtr, admins, knownUsers };
+  const snap = { masini, soferi, log: log.map(l=>({...l, preluat:_iso(l.preluat), restituit:_iso(l.restituit)})), carIdCtr, logIdCtr, admins, knownUsers };
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(snap)], {type:'application/json'}));
   a.download = 'backup_flota_'+new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')+'.json'; a.click();
   toast('✓ Backup flotă descărcat ca fișier (restaurare: „Încarcă din fișier”)');
@@ -5438,7 +5450,7 @@ const MAX_BACKUPS=5;
 function createBackupSnapshot(triggerBy){
   const snap={
     masini,soferi,
-    log:log.map(l=>({...l,preluat:l.preluat?l.preluat.toISOString():null,restituit:l.restituit?l.restituit.toISOString():null})),
+    log:log.map(l=>({...l,preluat:_iso(l.preluat),restituit:_iso(l.restituit)})),
     reparatii,taskuri,stoc,
     carIdCtr,logIdCtr,repIdCtr,taskIdCtr,stocIdCtr
   };
@@ -5825,7 +5837,7 @@ async function doActivateNotif(){
     } else {
       knownUsers.push({username:currentUser.username,name:currentUser.name,pushToken:token,pushTokens:[token],pushTokenUpdatedAt:new Date().toISOString(),firstSeen:new Date().toISOString(),lastSeen:new Date().toISOString()});
     }
-    const payload={masini,soferi,log:log.map(l=>({...l,preluat:l.preluat?l.preluat.toISOString():null,restituit:l.restituit?l.restituit.toISOString():null})),carIdCtr,logIdCtr,admins,knownUsers,forcedLogouts:window._currentForcedLogouts||{},reparatii,repIdCtr,taskuri,taskIdCtr,stoc,stocIdCtr,backupuri:backupuri.map(b=>({id:b.id,timestamp:b.timestamp,triggerBy:b.triggerBy,size:b.size||0})),backupIdCtr,flotaBackupuri:flotaBackupuri.map(b=>({id:b.id,timestamp:b.timestamp,triggerBy:b.triggerBy,size:b.size||0,snapshot:b.snapshot||''})),flotaBackupIdCtr,garantii,garantiiIdCtr,lastModifiedBy:currentUser.name,lastModifiedAt:new Date().toISOString()};
+    const payload={masini,soferi,log:log.map(l=>({...l,preluat:_iso(l.preluat),restituit:_iso(l.restituit)})),carIdCtr,logIdCtr,admins,knownUsers,forcedLogouts:window._currentForcedLogouts||{},reparatii,repIdCtr,taskuri,taskIdCtr,stoc,stocIdCtr,backupuri:backupuri.map(b=>({id:b.id,timestamp:b.timestamp,triggerBy:b.triggerBy,size:b.size||0})),backupIdCtr,flotaBackupuri:flotaBackupuri.map(b=>({id:b.id,timestamp:b.timestamp,triggerBy:b.triggerBy,size:b.size||0,snapshot:b.snapshot||''})),flotaBackupIdCtr,garantii,garantiiIdCtr,lastModifiedBy:currentUser.name,lastModifiedAt:new Date().toISOString()};
     await window.fbHelpers.setDoc(window.fbDocRef, window._noUndef(payload));
     const u = knownUsers.find(x=>x.username===currentUser.username);
     box.innerHTML = `✓ ACTIVAT!<br>Token: ${token.slice(0,25)}...<br>Dispozitive: ${u?.pushTokens?.length||1}<br><br>Apasă 📱 Test pentru a verifica.`;
@@ -6032,7 +6044,7 @@ async function refreshPushToken(){
     // Salvare directă imediată
     const payload = {
       masini, soferi,
-      log: log.map(l=>({...l, preluat:l.preluat?l.preluat.toISOString():null, restituit:l.restituit?l.restituit.toISOString():null})),
+      log: log.map(l=>({...l, preluat:_iso(l.preluat), restituit:_iso(l.restituit)})),
       carIdCtr, logIdCtr, admins, knownUsers,
       forcedLogouts: window._currentForcedLogouts||{},
       reparatii, repIdCtr, taskuri, taskIdCtr,
@@ -7419,7 +7431,7 @@ async function resetAllPushTokens(){
   try {
     const payload = {
       masini, soferi,
-      log: log.map(l=>({...l, preluat:l.preluat?l.preluat.toISOString():null, restituit:l.restituit?l.restituit.toISOString():null})),
+      log: log.map(l=>({...l, preluat:_iso(l.preluat), restituit:_iso(l.restituit)})),
       carIdCtr, logIdCtr, admins, knownUsers,
       forcedLogouts: window._currentForcedLogouts||{},
       reparatii, repIdCtr, taskuri, taskIdCtr,
@@ -7497,7 +7509,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261109-112744';
+const APP_VERSION='20261109-113329';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
