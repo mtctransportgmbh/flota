@@ -1845,6 +1845,22 @@ function visSoferi(){
   const l=soferi.map(s => typeof s === 'string' ? {name:s, location:''} : s);
   return isEiselfingUser() ? l.filter(s=>hasLoc(s,'Eiselfing')) : l;
 }
+// Jurnalul pentru profilul Eiselfing: nu doar mașinile care sunt ACUM la Eiselfing (altfel o mașină mutată/stricată
+// sau dată altcuiva dispare cu tot cu intrările ei), ci și tot ce ține de Eiselfing:
+//  - mașini acum la Eiselfing / la DHL din Eiselfing / stricate cu origine Eiselfing
+//  - intrări create sau închise chiar de contul Eiselfing
+//  - intrări la care șoferul e al Eiselfing-ului (sau categoria EISELFING)
+function eisLogVisible(l, vn){
+  if(vn.has((l.nr||'').toUpperCase())) return true;
+  const low=x=>String(x||'').trim().toLowerCase();
+  if([l.preluatByUsername,l.restituitByUsername,l.addedBy,l.preluatBy,l.restituitBy].some(x=>low(x)==='eiselfing')) return true;
+  if(low(l.sofer)==='eiselfing') return true;
+  const sf=soferi.find(x=>x && typeof x==='object' && x.name===l.sofer);
+  if(sf && hasLoc(sf,'Eiselfing')) return true;
+  const m=masini.find(x=>(x.nr||'').toUpperCase()===(l.nr||'').toUpperCase());
+  if(m && sk(m.sofer)==='STRICATA' && m.strOrigin==='Eiselfing') return true;
+  return false;
+}
 function visibleNrSet(){ return new Set(visibleMasini().map(m=>(m.nr||'').toUpperCase())); }
 function visibleMasini(){
   return isEiselfingUser() ? masini.filter(m=>pcLocationOf(m)==='Eiselfing' || hasLoc(soferi.find(x=>x && x.name===m.sofer),'Eiselfing')) : masini;
@@ -3427,7 +3443,7 @@ function renderLog(){
   const sorted=log.slice().sort((a,b)=>(b.preluat?.getTime()||0)-(a.preluat?.getTime()||0));
   const _vn=isEiselfingUser()?visibleNrSet():null;
   const filtered=sorted.filter(l=>{
-    if(_vn && !_vn.has((l.nr||'').toUpperCase())) return false;
+    if(_vn && !eisLogVisible(l,_vn)) return false;
     if(!q) return true;
     return (l.nr||'').toLowerCase().includes(q) || (l.sofer||'').toLowerCase().includes(q);
   });
@@ -7481,7 +7497,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261107-072837';
+const APP_VERSION='20261109-112744';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
