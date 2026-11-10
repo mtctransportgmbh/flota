@@ -1773,7 +1773,7 @@ if (!firebaseConfig || !firebaseConfig.apiKey) {
   function show(msg,src){
     try{
       const txt=String(msg||'');
-      if(/ResizeObserver|^Script error\.?$|chrome-extension|moz-extension|safari-extension/i.test(txt+' '+String(src||''))) return;
+      if(/ResizeObserver|^Script error\.?$|chrome-extension|moz-extension|safari-extension|ServiceWorker|service worker|sw\.js|Failed to fetch dynamically|Load failed|NetworkError|network error|ERR_INTERNET|AbortError/i.test(txt+' '+String(src||''))) return;   // erori de rețea / service worker: nu afectează datele, nu alarmăm utilizatorul
       const key=txt.slice(0,120), now=Date.now();
       if(seen[key] && now-seen[key]<60000) return; seen[key]=now;
       if(++shown>6) return;
@@ -7641,7 +7641,7 @@ document.getElementById('login-email').addEventListener('keypress',e=>{if(e.key=
 // ═════════════════════════════════════════════════════════════
 // ── ACTUALIZARE APLICAȚIE (versiune nouă = avertizare obligatorie) ─
 // ═════════════════════════════════════════════════════════════
-const APP_VERSION='20261109-132653';
+const APP_VERSION='20261110-101721';
 let _updInProgress=false, _lastIndexCheck=0;
 
 // scoate ?v=... din adresă după o actualizare
